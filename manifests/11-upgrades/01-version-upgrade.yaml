@@ -1,0 +1,19 @@
+# In-place Valkey version upgrade of the Sentinel deployment.
+# What happens: (optional) backup -> instance removed (PVCs kept) -> recreated on
+# the new version with the same PVCs -> primary/replica placement preserved.
+# THE INSTANCE IS UNAVAILABLE DURING THE UPGRADE. Schedule a maintenance window.
+# Docs: https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-for-valkey-on-kubernetes/3-5/valkey-on-kubernetes/version-upgrade.html
+# Verify the schema for your operator version:  kubectl explain valkeyversionupgrade.spec
+apiVersion: data.tanzu.vmware.com/v1
+kind: ValkeyVersionUpgrade
+metadata:
+  name: ${SENTINEL_NAME}-to-${VALKEY_TARGET_VERSION}
+  namespace: ${VALKEY_NS}
+spec:
+  valkeyInstance:
+    name: ${SENTINEL_NAME}
+  valkeyVersion:
+    version: ${VALKEY_TARGET_VERSION}
+  backupSpec:
+    takeBackup: true
+    backupLocation: workshop-s3

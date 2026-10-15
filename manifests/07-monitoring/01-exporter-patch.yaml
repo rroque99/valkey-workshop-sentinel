@@ -1,0 +1,15 @@
+# Merge-patch for the ValkeySentinel CR: enable the Prometheus exporter sidecar
+# (HTTPS on port 9121, path /metrics) in every Valkey data pod.
+# Field name per the property reference: spec.valkeyExporter
+#   kubectl explain valkeysentinel.spec.valkeyExporter
+spec:
+  valkeyExporter:
+    enabled: true
+  resources:
+    exporter:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi

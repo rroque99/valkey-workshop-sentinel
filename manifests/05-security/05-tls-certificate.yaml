@@ -1,0 +1,33 @@
+# Server certificate for the Valkey and Sentinel pods.
+# SANs must cover the pod FQDNs: *.<headless-service>.<namespace>.svc.<clusterDomain>
+# clientAuth is included so the cert also works with authClients: yes|optional (mTLS).
+# Docs: https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-for-valkey-on-kubernetes/3-5/valkey-on-kubernetes/configure-tls.html
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ${REPL_NAME}-tls
+  namespace: ${VALKEY_NS}
+spec:
+  secretName: ${REPL_NAME}-tls
+  duration: 2160h      # 90 days
+  renewBefore: 360h    # 15 days
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - server auth
+    - client auth
+  dnsNames:
+    - "*.${REPL_NAME}-headless.${VALKEY_NS}.svc.${CLUSTER_DOMAIN}"
+    - "${REPL_NAME}-headless.${VALKEY_NS}.svc.${CLUSTER_DOMAIN}"
+    - "${REPL_NAME}.${VALKEY_NS}.svc.${CLUSTER_DOMAIN}"
+    - "*.${SENTINEL_NAME}-headless.${VALKEY_NS}.svc.${CLUSTER_DOMAIN}"
+    - "${SENTINEL_NAME}-headless.${VALKEY_NS}.svc.${CLUSTER_DOMAIN}"
+    - "*.${SENTINEL_NAME}-sentinel-headless.${VALKEY_NS}.svc.${CLUSTER_DOMAIN}"
+    - "${SENTINEL_NAME}.${VALKEY_NS}.svc.${CLUSTER_DOMAIN}"
+    - "localhost"
+  ipAddresses:
+    - "127.0.0.1"
+  issuerRef:
+    name: valkey-ca-issuer
+    kind: Issuer

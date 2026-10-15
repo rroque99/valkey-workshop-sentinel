@@ -1,0 +1,56 @@
+# Troubleshooting / test client. Uses the SAME Tanzu Valkey image as the instance,
+# so valkey-cli and valkey-benchmark versions match the server.
+# ${VALKEY_IMAGE} is discovered from a running data pod (see docs/06-tools-cli-and-web-consoles.md).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: valkey-client
+  namespace: ${VALKEY_NS}
+  labels:
+    app: valkey-client
+    valkey-client: "true"
+spec:
+  imagePullSecrets:
+    - name: valkey-registry-secret
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 1001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: client
+      image: ${VALKEY_IMAGE}
+      command: ["sh", "-c", "sleep infinity"]
+      env:
+        - name: HOME
+          value: /tmp
+        - name: SENTINEL_HOST
+          value: "${SENTINEL_HOST}"
+        - name: MASTER_GROUP
+          value: "${MASTER_GROUP}"
+        - name: VALKEY_USER
+          valueFrom: {secretKeyRef: {name: valkey-client-credentials, key: app-user}}
+        - name: VALKEY_PASSWORD
+          valueFrom: {secretKeyRef: {name: valkey-client-credentials, key: app-password}}
+        - name: ADMIN_PASSWORD
+          valueFrom: {secretKeyRef: {name: valkey-client-credentials, key: admin-password}}
+        - name: SENTINEL_PASSWORD
+          valueFrom: {secretKeyRef: {name: valkey-client-credentials, key: sentinel-password}}
+        - name: SENTINEL_AUTH
+          value: "${SENTINEL_AUTH}"   # "true" after module 05 enables Sentinel auth
+      resources:
+        requests: {cpu: 100m, memory: 64Mi}
+        limits: {cpu: "1", memory: 256Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+  volumes:
+    - name: scripts
+      configMap:
+        name: workshop-client-scripts
+        defaultMode: 0555

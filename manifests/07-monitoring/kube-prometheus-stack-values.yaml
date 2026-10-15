@@ -1,0 +1,68 @@
+# kube-prometheus-stack ("Prometheus all-in-one"): Prometheus Operator, Prometheus,
+# Alertmanager, Grafana, kube-state-metrics and node-exporter.
+# Chart: https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
+#
+# Install (see docs/07-metrics-prometheus-grafana.md):
+#   helm upgrade --install kps prometheus-community/kube-prometheus-stack \
+#     -n $MONITORING_NS --create-namespace -f kube-prometheus-stack-values.yaml \
+#     --set grafana.adminPassword="$GRAFANA_ADMIN_PASSWORD" \
+#     --set grafana.service.type=$MONITORING_SERVICE_TYPE \
+#     --set prometheus.service.type=$MONITORING_SERVICE_TYPE
+
+fullnameOverride: kps
+
+prometheus:
+  prometheusSpec:
+    # Pick up PodMonitors / ServiceMonitors / PrometheusRules from ANY namespace,
+    # not only those carrying the Helm release label.
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    retention: 7d
+    resources:
+      requests: {cpu: 250m, memory: 1Gi}
+      limits: {memory: 2Gi}
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+
+grafana:
+  enabled: true
+  defaultDashboardsEnabled: true      # Kubernetes compute / node dashboards
+  defaultDashboardsTimezone: browser
+  persistence:
+    enabled: false
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard        # ConfigMaps with this label are loaded as dashboards
+      labelValue: "1"
+      searchNamespace: ALL
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
+    datasources:
+      enabled: true
+
+# Some platforms (including VKS with Pod Security Admission) do not allow the
+# host root filesystem mount used by node-exporter.
+prometheus-node-exporter:
+  hostRootFsMount:
+    enabled: false
+
+kube-state-metrics:
+  metricLabelsAllowlist:
+    - pods=[app,app.kubernetes.io/name,app.kubernetes.io/component]

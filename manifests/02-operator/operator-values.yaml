@@ -1,0 +1,38 @@
+# Helm value overrides for the Tanzu for Valkey on Kubernetes operator (chart 3.5.x)
+# Reference: https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-for-valkey-on-kubernetes/3-5/valkey-on-kubernetes/install-operator.html
+#
+# Keep this file in version control. Helm only re-applies these overrides on
+# `helm upgrade` if you pass the file again (-f operator-values.yaml).
+
+# Use cert-manager to issue the operator's admission webhook certificate.
+# Set to false if cert-manager is not installed: the operator then generates
+# and renews a self-signed webhook certificate itself.
+certManager:
+  enabled: true
+
+# Must match the DNS suffix of your cluster (affects TLS SANs and service FQDNs).
+kubernetesClusterDomain: cluster.local
+
+# Empty list = watch all namespaces. Restrict in shared clusters, for example:
+# watchNamespaces: ["valkey-workshop", "valkey-workshop-dr"]
+watchNamespaces: []
+
+# Pull secret that must exist in the operator namespace AND every instance namespace.
+imagePullSecretName: valkey-registry-secret
+
+# Keep true on VKS / vanilla Kubernetes. Set to false on OpenShift.
+enableSecurityContext: true
+
+operator:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  # Example: pin the operator to a dedicated node pool
+  # nodeSelector:
+  #   node-role.example.com/platform: "true"
+  # tolerations: []
+  # affinity: {}

@@ -1,0 +1,22 @@
+# ALTERNATIVE to valkeyAdminConfig.enabled: a stand-alone ValkeyAdmin CR that
+# points at an existing instance. Useful when one Admin UI should be managed
+# separately from the instance lifecycle. Not needed if you applied 04-consoles-patch.yaml.
+# Field reference: property-reference-valkey.html#valkey-admin
+# Verify the schema for your version:  kubectl explain valkeyadmin.spec
+apiVersion: data.tanzu.vmware.com/v1
+kind: ValkeyAdmin
+metadata:
+  name: ${SENTINEL_NAME}-admin-standalone
+  namespace: ${VALKEY_NS}
+spec:
+  valkeyHost: ${REPL_NAME}-headless.${VALKEY_NS}.svc.${CLUSTER_DOMAIN}
+  valkeyPort: "6379"
+  endpointType: node
+  authType: password
+  valkeySecret:
+    name: ${REPL_NAME}-credentials
+    userKey: username
+    passwordKey: password
+  port: 8080
+  kubernetesConfig:
+    serviceType: ClusterIP

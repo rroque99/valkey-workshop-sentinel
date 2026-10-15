@@ -1,0 +1,45 @@
+# Restrict ingress to the Valkey namespace.
+# Allows:
+#   - any pod in this namespace (Valkey <-> Valkey, Sentinel <-> Valkey, consoles, test client)
+#   - the operator namespace (heartbeat, reconciliation, backups)
+#   - the monitoring namespace on the exporter port (Prometheus scrape)
+#   - pods labelled valkey-client=true in namespaces labelled valkey-access=true (applications)
+# Ports: 6379 Valkey, 26379 Sentinel, 9121 exporter, 6380 auth sidecar (OAuth/LDAP),
+#        8080 Valkey Admin, 8081 Valkey Commander
+# Requires a CNI that enforces NetworkPolicy (Antrea and Calico on VKS do).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: valkey-workshop-ingress
+  namespace: ${VALKEY_NS}
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ${OPERATOR_NS}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ${MONITORING_NS}
+      ports:
+        - port: 9121
+          protocol: TCP
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              valkey-access: "true"
+          podSelector:
+            matchLabels:
+              valkey-client: "true"
+      ports:
+        - port: 6379
+          protocol: TCP
+        - port: 26379
+          protocol: TCP
+        - port: 6380
+          protocol: TCP

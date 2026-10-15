@@ -1,0 +1,14 @@
+# OPTIONAL: add Loki as a Grafana data source. Apply as an extra values file on
+# the kube-prometheus-stack release:
+#   helm upgrade kps prometheus-community/kube-prometheus-stack -n $MONITORING_NS \
+#     -f manifests/07-monitoring/kube-prometheus-stack-values.yaml \
+#     -f <(render manifests/08-logging/kps-loki-datasource-values.yaml | sed "/^---$/d") \
+#     --set grafana.adminPassword="$GRAFANA_ADMIN_PASSWORD"
+grafana:
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      uid: loki
+      access: proxy
+      url: http://loki-gateway.${MONITORING_NS}.svc.${CLUSTER_DOMAIN}
+      isDefault: false

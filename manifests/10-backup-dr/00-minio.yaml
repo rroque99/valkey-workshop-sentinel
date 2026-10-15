@@ -1,0 +1,118 @@
+# LAB ONLY: single-node MinIO as an S3-compatible backup target inside the cluster.
+# In production point ValkeyBackupLocation at an S3 service that lives OUTSIDE
+# the cluster (and ideally outside the site) - AWS S3, MinIO/AIStor cluster,
+# Dell ECS, NetApp StorageGRID, Cloudian, ...
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${MINIO_NS}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-root
+  namespace: ${MINIO_NS}
+type: Opaque
+stringData:
+  MINIO_ROOT_USER: "valkey-backup"
+  MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-data
+  namespace: ${MINIO_NS}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: ${MINIO_NS}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: minio}
+  template:
+    metadata:
+      labels: {app: minio}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: minio
+          image: quay.io/minio/minio:latest
+          args: ["server", "/data", "--console-address", ":9001"]
+          envFrom:
+            - secretRef: {name: minio-root}
+          ports:
+            - {name: s3, containerPort: 9000}
+            - {name: console, containerPort: 9001}
+          readinessProbe:
+            httpGet: {path: /minio/health/ready, port: 9000}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: minio-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: ${MINIO_NS}
+spec:
+  selector: {app: minio}
+  ports:
+    - {name: s3, port: 9000, targetPort: 9000}
+    - {name: console, port: 9001, targetPort: 9001}
+---
+# Creates the backup bucket once MinIO is ready
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-create-bucket
+  namespace: ${MINIO_NS}
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mc
+          image: quay.io/minio/mc:latest
+          env:
+            - {name: HOME, value: /tmp}
+            - name: S3_ACCESS_KEY
+              valueFrom: {secretKeyRef: {name: minio-root, key: MINIO_ROOT_USER}}
+            - name: S3_SECRET_KEY
+              valueFrom: {secretKeyRef: {name: minio-root, key: MINIO_ROOT_PASSWORD}}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              mc alias set lab http://minio.${MINIO_NS}.svc:9000 "$S3_ACCESS_KEY" "$S3_SECRET_KEY" &&
+              mc mb --ignore-existing lab/${BACKUP_BUCKET} &&
+              mc ls lab
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}

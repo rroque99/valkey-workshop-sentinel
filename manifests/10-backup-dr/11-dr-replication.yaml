@@ -1,0 +1,37 @@
+# DR copy: a ValkeyReplication whose primary replicates FROM the source site.
+# Sentinel DR support is "limited" per the docs: replicate into a ValkeyReplication,
+# then (after promotion) wrap it with a new ValkeySentinel.
+# Docs: https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-for-valkey-on-kubernetes/3-5/valkey-on-kubernetes/disaster-recovery-workflow.html
+apiVersion: data.tanzu.vmware.com/v1
+kind: ValkeyReplication
+metadata:
+  name: vk-repl-dr
+  namespace: ${DR_NS}
+spec:
+  clusterSize: 2                      # keep the lab small: 1 primary + 1 replica
+  valkeyVersion:
+    name: ${VALKEY_VERSION}           # DR site must run a compatible version
+  persistence:
+    storageSize: ${STORAGE_SIZE}
+    rdb:
+      entries:
+        - seconds: 900
+          changes: 1
+        - seconds: 300
+          changes: 10
+  acl:
+    secret:
+      secretName: vk-repl-dr-acl-secret
+  kubernetesConfig:
+    imagePullSecrets: ["valkey-registry-secret"]
+    valkeySecret:
+      name: vk-repl-dr-credentials
+      userKey: username
+      passwordKey: password
+  deploymentOptions:
+    replicaOf:
+      host: "${DR_SOURCE_HOST}"       # endpoint of the source primary reachable from the DR site
+      port: "6379"
+      passwordRef:
+        name: dr-source-password
+        key: password

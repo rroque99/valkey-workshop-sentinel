@@ -1,0 +1,148 @@
+# Alerting rules for Valkey Sentinel deployments.
+# Metric names assume the exporter prefix "valkey_". If your exporter exposes
+# "redis_*" metrics, run:  scripts/switch-metric-prefix.sh redis
+# (see "Discover the metric names" in docs/07-metrics-prometheus-grafana.md)
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: valkey-sentinel-alerts
+  namespace: ${MONITORING_NS}
+  labels:
+    workshop: valkey-sentinel
+spec:
+  groups:
+    - name: valkey.availability
+      rules:
+        - alert: ValkeyInstanceDown
+          expr: valkey_up{namespace=~"${VALKEY_NS}|${DR_NS}"} == 0
+          for: 1m
+          labels: {severity: critical}
+          annotations:
+            summary: "Valkey {{ $labels.namespace }}/{{ $labels.pod }} is down"
+            description: "The exporter cannot reach the Valkey process for more than 1 minute."
+
+        - alert: ValkeyExporterTargetMissing
+          expr: up{namespace=~"${VALKEY_NS}|${DR_NS}", job=~".*tanzu-valkey-instances.*"} == 0
+          for: 2m
+          labels: {severity: warning}
+          annotations:
+            summary: "Metrics target {{ $labels.namespace }}/{{ $labels.pod }} is not scrapeable"
+            description: "Check the exporter sidecar, the NetworkPolicy (port 9121) and the PodMonitor."
+
+        - alert: ValkeyNoPrimary
+          expr: |
+            count by (namespace, app) (valkey_up{namespace=~"${VALKEY_NS}|${DR_NS}"})
+              unless
+            count by (namespace, app) (valkey_instance_info{namespace=~"${VALKEY_NS}|${DR_NS}", role="master"})
+          for: 1m
+          labels: {severity: critical}
+          annotations:
+            summary: "No primary in {{ $labels.namespace }}/{{ $labels.app }}"
+            description: "No pod reports role=master. Writes are failing. Check Sentinel (SENTINEL masters) and the operator logs."
+
+        - alert: ValkeyMultiplePrimaries
+          expr: count by (namespace, app) (valkey_instance_info{namespace=~"${VALKEY_NS}|${DR_NS}", role="master"}) > 1
+          for: 2m
+          labels: {severity: critical}
+          annotations:
+            summary: "{{ $value }} primaries in {{ $labels.namespace }}/{{ $labels.app }} (possible split brain)"
+            description: "More than one pod reports role=master for 2 minutes. Investigate network partitions and Sentinel quorum."
+
+        - alert: ValkeyFailoverOccurred
+          expr: |
+            count by (namespace, app, pod) (valkey_instance_info{namespace=~"${VALKEY_NS}|${DR_NS}", role="master"})
+              unless
+            count by (namespace, app, pod) (valkey_instance_info{namespace=~"${VALKEY_NS}|${DR_NS}", role="master"} offset 5m)
+          for: 0m
+          labels: {severity: info}
+          annotations:
+            summary: "Primary changed in {{ $labels.namespace }}/{{ $labels.app }} (new primary {{ $labels.pod }})"
+            description: "A Sentinel failover (automatic or manual) happened in the last few minutes."
+
+        - alert: ValkeyPodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace=~"${VALKEY_NS}|${DR_NS}"}[15m]) > 2
+          labels: {severity: warning}
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) restarted {{ $value | humanize }} times in 15m"
+
+    - name: valkey.replication
+      rules:
+        - alert: ValkeyReplicaLinkDown
+          expr: valkey_master_link_up{namespace=~"${VALKEY_NS}|${DR_NS}"} == 0
+          for: 2m
+          labels: {severity: critical}
+          annotations:
+            summary: "Replica {{ $labels.namespace }}/{{ $labels.pod }} lost its link to the primary"
+
+        - alert: ValkeyReplicationLagHigh
+          expr: valkey_connected_slave_lag_seconds{namespace=~"${VALKEY_NS}|${DR_NS}"} > 10
+          for: 2m
+          labels: {severity: warning}
+          annotations:
+            summary: "Replication lag {{ $value }}s on {{ $labels.namespace }}/{{ $labels.pod }}"
+
+        - alert: ValkeyTooFewReplicas
+          expr: max by (namespace, app) (valkey_connected_slaves{namespace=~"${VALKEY_NS}"} * on (namespace, pod) group_left valkey_instance_info{role="master"}) < 2
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "Primary of {{ $labels.namespace }}/{{ $labels.app }} has only {{ $value }} connected replicas"
+
+    - name: valkey.resources
+      rules:
+        - alert: ValkeyMemoryNearMaxmemory
+          expr: valkey_memory_used_bytes / (valkey_memory_max_bytes > 0) > 0.90
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} uses {{ $value | humanizePercentage }} of maxmemory"
+
+        - alert: ValkeyMemoryNearContainerLimit
+          expr: |
+            max by (namespace, pod) (container_memory_working_set_bytes{namespace=~"${VALKEY_NS}|${DR_NS}", container!="", container!="POD"})
+              /
+            max by (namespace, pod) (kube_pod_container_resource_limits{namespace=~"${VALKEY_NS}|${DR_NS}", resource="memory"}) > 0.90
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} is at {{ $value | humanizePercentage }} of its memory limit (OOMKill risk)"
+
+        - alert: ValkeyHighFragmentation
+          expr: |
+            {__name__=~"valkey_(mem|memory)_fragmentation_ratio", namespace=~"${VALKEY_NS}|${DR_NS}"} > 1.5
+              and on (namespace, pod) valkey_memory_used_bytes > 100 * 1024 * 1024
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: "Memory fragmentation ratio {{ $value }} on {{ $labels.namespace }}/{{ $labels.pod }}"
+            description: "Consider activedefrag or a controlled restart (failover first if it is the primary)."
+
+        - alert: ValkeyEvictingKeys
+          expr: rate(valkey_evicted_keys_total{namespace=~"${VALKEY_NS}|${DR_NS}"}[5m]) > 0
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} is evicting keys ({{ $value | humanize }}/s)"
+
+        - alert: ValkeyConnectionsHigh
+          expr: valkey_connected_clients / (valkey_config_maxclients > 0) > 0.80
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} uses {{ $value | humanizePercentage }} of maxclients"
+
+        - alert: ValkeyRejectedConnections
+          expr: increase(valkey_rejected_connections_total{namespace=~"${VALKEY_NS}|${DR_NS}"}[5m]) > 0
+          labels: {severity: critical}
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} rejected connections (maxclients reached)"
+
+    - name: valkey.persistence
+      rules:
+        - alert: ValkeyRdbSaveFailed
+          expr: valkey_rdb_last_bgsave_status{namespace=~"${VALKEY_NS}|${DR_NS}"} == 0
+          for: 1m
+          labels: {severity: critical}
+          annotations:
+            summary: "Last RDB background save failed on {{ $labels.namespace }}/{{ $labels.pod }}"
+            description: "Check PVC capacity (kubectl get pvc) and the Valkey logs for 'Background saving error'."

@@ -1,0 +1,52 @@
+# OPTIONAL: Grafana Alloy collects pod logs through the Kubernetes API
+# (loki.source.kubernetes) - no hostPath mounts, so it works under restricted
+# Pod Security on VKS. Runs as a single Deployment replica to avoid duplicates.
+#   helm upgrade --install alloy grafana/alloy -n $MONITORING_NS \
+#     -f <(render manifests/08-logging/alloy-values.yaml | sed "/^---$/d")
+controller:
+  type: deployment
+  replicas: 1
+alloy:
+  configMap:
+    content: |
+      discovery.kubernetes "pods" {
+        role = "pod"
+        namespaces {
+          names = ["${VALKEY_NS}", "${DR_NS}", "${OPERATOR_NS}"]
+        }
+      }
+
+      discovery.relabel "pods" {
+        targets = discovery.kubernetes.pods.targets
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_name"]
+          target_label  = "container"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app"]
+          target_label  = "app"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_node_name"]
+          target_label  = "node"
+        }
+      }
+
+      loki.source.kubernetes "pods" {
+        targets    = discovery.relabel.pods.output
+        forward_to = [loki.write.default.receiver]
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki-gateway.${MONITORING_NS}.svc.${CLUSTER_DOMAIN}/loki/api/v1/push"
+        }
+      }

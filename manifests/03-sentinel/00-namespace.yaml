@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${VALKEY_NS}
+  labels:
+    workshop: valkey-sentinel
+    # VKS / Pod Security Admission: Valkey pods run with the operator's
+    # security context and are expected to satisfy "baseline" or better.
+    # If pods are rejected by PodSecurity, see docs/01-prerequisites.md.
+    pod-security.kubernetes.io/warn: restricted

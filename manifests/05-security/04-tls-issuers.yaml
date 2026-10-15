@@ -1,0 +1,35 @@
+# Lab PKI with cert-manager: self-signed root -> CA -> namespace Issuer.
+# In production, use your enterprise CA (Vault, Venafi, AD CS, ...) via a ClusterIssuer.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: valkey-selfsigned
+  namespace: ${VALKEY_NS}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: valkey-workshop-ca
+  namespace: ${VALKEY_NS}
+spec:
+  isCA: true
+  commonName: valkey-workshop-ca
+  secretName: valkey-workshop-ca
+  duration: 87600h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: valkey-selfsigned
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: valkey-ca-issuer
+  namespace: ${VALKEY_NS}
+spec:
+  ca:
+    secretName: valkey-workshop-ca

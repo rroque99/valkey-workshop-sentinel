@@ -1,0 +1,9 @@
+# Merge-patch for the ValkeySentinel CR: enable TLS (one-way, clients need no cert).
+# authClients: "no" (default) | "optional" | "yes" (strict mTLS)
+# NOTE: enabling TLS restarts the pods. Verify the field shape for your operator
+# version first:   kubectl explain valkeysentinel.spec.TLS
+spec:
+  TLS:
+    secret:
+      secretName: ${REPL_NAME}-tls
+    authClients: "no"

@@ -1,0 +1,13 @@
+# Scheduled backups (cron syntax, evaluated in the operator's time zone - normally UTC).
+# Workshop: every 15 minutes so you can watch it fire. Production: e.g. "0 */6 * * *".
+apiVersion: data.tanzu.vmware.com/v1
+kind: ValkeyBackupSchedule
+metadata:
+  name: ${REPL_NAME}-every-15m
+  namespace: ${VALKEY_NS}
+spec:
+  schedule: "*/15 * * * *"
+  backupSpec:
+    backupLocation: workshop-s3
+    valkeyInstance: ${REPL_NAME}
+    retentionInDays: 2

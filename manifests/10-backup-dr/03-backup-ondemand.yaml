@@ -1,0 +1,11 @@
+# On-demand backup. For a ValkeySentinel, valkeyInstance is the name of the
+# ValkeyReplication (spec.valkeyReplicationConfig.name), NOT the Sentinel CR name.
+apiVersion: data.tanzu.vmware.com/v1
+kind: ValkeyBackup
+metadata:
+  name: ${REPL_NAME}-manual-01
+  namespace: ${VALKEY_NS}
+spec:
+  backupLocation: workshop-s3
+  valkeyInstance: ${REPL_NAME}
+  retentionInDays: 7

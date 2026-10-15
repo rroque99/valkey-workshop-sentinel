@@ -1,0 +1,15 @@
+# EXAMPLE ONLY - do not apply as-is.
+# ValkeyImageSet is cluster-scoped and defines the companion (sidecar) images for
+# ALL instances: exporter, persistence (backup/restore), auth (OAuth/LDAP),
+# commander, admin, modules, mcp. The chart installs "default-valkey-image-set".
+# A Broadcom patch for a sidecar CVE is normally delivered through an operator
+# upgrade (helm upgrade updates this object). Editing it by hand is for urgent
+# hot-fixes and is overwritten by the next helm upgrade.
+#   kubectl get vkimageset default-valkey-image-set -o yaml
+#   kubectl explain valkeyimageset.spec
+apiVersion: data.tanzu.vmware.com/v1
+kind: ValkeyImageSet
+metadata:
+  name: default-valkey-image-set
+spec:
+  exporter: ${REGISTRY_SERVER}/tanzu-valkey-container/<exporter-image>:<patched-tag>

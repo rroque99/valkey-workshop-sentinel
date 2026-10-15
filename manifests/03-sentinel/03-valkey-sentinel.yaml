@@ -1,0 +1,95 @@
+# Highly-available Valkey: 3 Sentinels monitoring 1 primary + 2 replicas.
+# CR reference: https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-for-valkey-on-kubernetes/3-5/valkey-on-kubernetes/property-reference-valkey.html
+apiVersion: data.tanzu.vmware.com/v1
+kind: ValkeySentinel
+metadata:
+  name: ${SENTINEL_NAME}
+  namespace: ${VALKEY_NS}
+  labels:
+    workshop: valkey-sentinel
+spec:
+  valkeyVersion:
+    name: ${VALKEY_VERSION}
+
+  # ---- Sentinel tier ---------------------------------------------------------
+  clusterSize: 3                     # number of Sentinel pods (always odd: 3 or 5)
+  valkeySentinelConfig:
+    quorum: "2"                      # Sentinels that must agree the primary is down
+    downAfterMilliseconds: "5000"    # workshop value; default 30000. Tune for prod!
+    failoverTimeout: "60000"         # default 180000
+    parallelSyncs: "1"               # replicas re-syncing to a new primary at once
+  podDisruptionBudget:               # PDB for the Sentinel pods (minAvailable defaults to quorum)
+    enabled: true
+  affinity:                          # spread Sentinel pods across worker nodes
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["${SENTINEL_NAME}-sentinel", "${SENTINEL_NAME}"]
+
+  # ---- Data tier (ValkeyReplication managed through Sentinel) -------------
+  valkeyReplicationConfig:
+    name: ${REPL_NAME}
+    size: 3                          # 1 primary + 2 replicas
+    maxClients: 10000
+    podDisruptionBudget:             # creates separate primary and replica PDBs
+      enabled: true
+    affinity:                        # spread primary/replicas across worker nodes
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: ["${REPL_NAME}"]
+
+  # ---- Persistence (required for backups and version upgrades) --------------
+  persistence:
+    storageSize: ${STORAGE_SIZE}
+    # Uses the cluster's default StorageClass (see docs/01-prerequisites.md).
+    rdb:
+      entries:
+        - seconds: 900
+          changes: 1
+        - seconds: 300
+          changes: 10
+        - seconds: 60
+          changes: 10000
+
+  # ---- Security ---------------------------------------------------------------
+  acl:
+    secret:
+      secretName: ${REPL_NAME}-acl-secret
+  kubernetesConfig:
+    serviceType: ${SERVICE_TYPE}
+    imagePullSecrets:
+      - valkey-registry-secret
+    valkeySecret:                    # identity used by operator / Sentinel / exporter
+      name: ${REPL_NAME}-credentials
+      userKey: username
+      passwordKey: password
+
+  # ---- Resources ----------------------------------------------------------------
+  resources:
+    instance:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    sentinel:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi

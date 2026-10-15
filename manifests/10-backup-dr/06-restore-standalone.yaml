@@ -1,0 +1,32 @@
+# Restore the backup into a NEW standalone instance (cheap way to verify a backup:
+# "a backup is only as good as its last tested restore").
+# Docs: https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-for-valkey-on-kubernetes/3-5/valkey-on-kubernetes/restore.html
+apiVersion: data.tanzu.vmware.com/v1
+kind: ValkeyRestore
+metadata:
+  name: restore-to-standalone
+  namespace: ${VALKEY_NS}
+spec:
+  sourceBackup:
+    name: ${REPL_NAME}-manual-01
+  targetInstance:
+    name: vk-restored
+    type: Valkey
+    spec:
+      valkeyVersion:
+        name: ${VALKEY_VERSION}
+      persistence:
+        storageSize: ${STORAGE_SIZE}
+        rdb:
+          entries:
+            - seconds: 900
+              changes: 1
+      acl:
+        secret:
+          secretName: vk-restored-acl-secret
+      kubernetesConfig:
+        imagePullSecrets: ["valkey-registry-secret"]
+        valkeySecret:
+          name: vk-restored-credentials
+          userKey: username
+          passwordKey: password

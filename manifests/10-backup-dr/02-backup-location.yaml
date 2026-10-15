@@ -1,0 +1,17 @@
+# Where backups are stored. Use a unique bucket or bucketPath per namespace.
+# Docs: https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-for-valkey-on-kubernetes/3-5/valkey-on-kubernetes/backup.html
+apiVersion: data.tanzu.vmware.com/v1
+kind: ValkeyBackupLocation
+metadata:
+  name: workshop-s3
+  namespace: ${VALKEY_NS}
+spec:
+  storage:
+    s3:
+      bucket: "${BACKUP_BUCKET}"
+      bucketPath: "/${VALKEY_NS}/"        # must end with "/"
+      region: "us-east-1"                 # any non-empty value for MinIO
+      endpoint: "http://minio.${MINIO_NS}.svc.${CLUSTER_DOMAIN}:9000"
+      enableSSL: false                    # true for real S3 endpoints (https)
+      secret:
+        name: valkey-backup-s3-credentials

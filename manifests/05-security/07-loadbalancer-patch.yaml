@@ -1,0 +1,6 @@
+# Merge-patch for the ValkeySentinel CR: expose the services through a LoadBalancer
+# (NSX / Avi on VKS, cloud LB on EKS/AKS/GKE, MetalLB on bare metal).
+# Only do this with authentication (and ideally TLS) enabled.
+spec:
+  kubernetesConfig:
+    serviceType: LoadBalancer

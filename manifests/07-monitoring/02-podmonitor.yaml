@@ -1,0 +1,30 @@
+# Scrape every pod that exposes a container port named "metrics" in the Valkey
+# namespaces. Based on the PodMonitor in the Broadcom monitoring docs:
+# https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-for-valkey-on-kubernetes/3-5/valkey-on-kubernetes/monitoring.html
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: tanzu-valkey-instances
+  namespace: ${MONITORING_NS}
+  labels:
+    workshop: valkey-sentinel
+spec:
+  namespaceSelector:
+    matchNames:
+      - ${VALKEY_NS}
+      - ${DR_NS}
+  selector: {}                     # all pods; only those with a "metrics" port are scraped
+  podTargetLabels:
+    - app
+    - app.kubernetes.io/component
+    - app.kubernetes.io/name
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 10s
+      scheme: https
+      tlsConfig:
+        insecureSkipVerify: true   # exporter uses an operator-managed certificate
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node

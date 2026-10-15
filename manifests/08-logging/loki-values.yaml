@@ -1,0 +1,42 @@
+# OPTIONAL: single-binary Loki for the workshop (filesystem storage, no HA).
+# Chart: https://github.com/grafana/loki/tree/main/production/helm/loki
+#   helm upgrade --install loki grafana/loki -n $MONITORING_NS -f loki-values.yaml
+# For production use your enterprise log platform or a scalable Loki with object storage.
+deploymentMode: SingleBinary
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  limits_config:
+    retention_period: 72h
+  pattern_ingester:
+    enabled: true
+singleBinary:
+  replicas: 1
+  persistence:
+    size: 10Gi
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+lokiCanary:
+  enabled: false
+test:
+  enabled: false
