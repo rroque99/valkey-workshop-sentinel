@@ -25,7 +25,7 @@ spec:
         secret:
           secretName: vk-restored-acl-secret
       kubernetesConfig:
-        imagePullSecrets: ["valkey-registry-secret"]
+        imagePullSecrets: [{name: valkey-registry-secret}]
         valkeySecret:
           name: vk-restored-credentials
           userKey: username

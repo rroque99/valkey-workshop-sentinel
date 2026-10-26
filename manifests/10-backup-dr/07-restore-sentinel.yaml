@@ -32,7 +32,7 @@ spec:
         secret:
           secretName: vk-restored-ha-repl-acl-secret
       kubernetesConfig:
-        imagePullSecrets: ["valkey-registry-secret"]
+        imagePullSecrets: [{name: valkey-registry-secret}]
         valkeySecret:
           name: vk-restored-ha-credentials
           userKey: username

@@ -71,7 +71,7 @@ spec:
   kubernetesConfig:
     serviceType: ${SERVICE_TYPE}
     imagePullSecrets:
-      - valkey-registry-secret
+      - name: valkey-registry-secret
     valkeySecret:                    # identity used by operator / Sentinel / exporter
       name: ${REPL_NAME}-credentials
       userKey: username
