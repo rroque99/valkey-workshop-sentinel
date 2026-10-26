@@ -27,7 +27,7 @@ spec:
         rdb:
           entries:
             - seconds: 900
-              changes: 1
+              changes: "1"
       acl:
         secret:
           secretName: vk-restored-ha-repl-acl-secret

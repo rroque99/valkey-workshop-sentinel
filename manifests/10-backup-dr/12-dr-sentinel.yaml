@@ -20,9 +20,9 @@ spec:
     rdb:
       entries:
         - seconds: 900
-          changes: 1
+          changes: "1"
         - seconds: 300
-          changes: 10
+          changes: "10"
   acl:
     secret:
       secretName: vk-repl-dr-acl-secret

@@ -58,11 +58,11 @@ spec:
     rdb:
       entries:
         - seconds: 900
-          changes: 1
+          changes: "1"
         - seconds: 300
-          changes: 10
+          changes: "10"
         - seconds: 60
-          changes: 10000
+          changes: "10000"
 
   # ---- Security ---------------------------------------------------------------
   acl:
