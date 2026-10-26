@@ -57,11 +57,11 @@ spec:
     # Uses the cluster's default StorageClass (see docs/01-prerequisites.md).
     rdb:
       entries:
-        - seconds: 900
+        - seconds: "900"
           changes: "1"
-        - seconds: 300
+        - seconds: "300"
           changes: "10"
-        - seconds: 60
+        - seconds: "60"
           changes: "10000"
 
   # ---- Security ---------------------------------------------------------------

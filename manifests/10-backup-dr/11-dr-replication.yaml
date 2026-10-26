@@ -15,9 +15,9 @@ spec:
     storageSize: ${STORAGE_SIZE}
     rdb:
       entries:
-        - seconds: 900
+        - seconds: "900"
           changes: "1"
-        - seconds: 300
+        - seconds: "300"
           changes: "10"
   acl:
     secret:
