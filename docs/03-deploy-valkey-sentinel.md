@@ -52,7 +52,7 @@ Two secrets, two different purposes:
 | Secret | Referenced by | Used for |
 |--------|---------------|----------|
 | `vk-repl-credentials` | `spec.kubernetesConfig.valkeySecret` | The **platform identity**: operator heartbeat, Sentinel → Valkey auth (`sentinel auth-user/auth-pass`), replica → primary auth, exporter |
-| `vk-repl-acl-secret` | `spec.acl.secret.secretName` | The **ACL file** (`user.acl`) loaded by every data pod |
+| `vk-repl-acl-secret` | `spec.acl.secret.secretName` | The **ACL file** (`user.acl`) loaded by every data pod and Sentinel pod |
 
 The ACL file in [`02-acl-secret.yaml`](../manifests/03-sentinel/02-acl-secret.yaml) defines four users:
 
@@ -61,7 +61,7 @@ The ACL file in [`02-acl-secret.yaml`](../manifests/03-sentinel/02-acl-secret.ya
 | `default` | `on >*** ~* &* +@all` | platform components (must exist and **must have a password**) |
 | `admin` | `on >*** ~* &* +@all` | human operators (named and auditable) |
 | `appuser` | `~app:* +@read +@write +@connection +@transaction -@dangerous` | applications (only `app:*` keys) |
-| `monitor` | `-@all +@read +info +ping +client\|list +slowlog\|get …` | read-only troubleshooting |
+| `monitor` | `-@all +@read +@connection +info +ping +client\|list` | read-only troubleshooting |
 
 ⚠️ **Caution, three rules from the Broadcom ACL guide:**
 
