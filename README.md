@@ -82,7 +82,7 @@ When you finish, you will be able to:
 ├── manifests/                <- YAML for every lab, grouped by module
 │   ├── 02-operator/          Helm values for the operator
 │   ├── 03-sentinel/          namespace, secrets, ACLs, ValkeySentinel CR
-│   ├── 05-security/          Sentinel auth, NetworkPolicy, TLS (cert-manager), LoadBalancer
+│   ├── 05-security/          NetworkPolicy, TLS (cert-manager), LoadBalancer
 │   ├── 06-tools/             client pod, Valkey Admin / Commander
 │   ├── 07-monitoring/        kube-prometheus-stack values, exporter, PodMonitor, alert rules
 │   ├── 08-logging/           optional Loki + Alloy

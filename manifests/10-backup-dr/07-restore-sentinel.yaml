@@ -1,7 +1,10 @@
 # OPTIONAL (needs 6 more pods): restore into a NEW highly-available ValkeySentinel.
 # This is the shape of a real production restore.
 # Pre-create vk-restored-ha-repl-acl-secret and vk-restored-ha-credentials
-# (same content as 05-restore-acl-secret.yaml with the new names).
+# (same content as 05-restore-acl-secret.yaml with the new names), plus
+# vk-restored-ha-sentinel-credentials (same shape as the Sentinel secret in
+# manifests/03-sentinel/01-valkey-credentials-secret.yaml).
+# ACL and persistence sit under valkeyReplicationConfig (see module 3, rule 4).
 apiVersion: data.tanzu.vmware.com/v1
 kind: ValkeyRestore
 metadata:
@@ -19,18 +22,22 @@ spec:
       clusterSize: 3
       valkeySentinelConfig:
         quorum: "2"
+        sentinelSecret:
+          name: vk-restored-ha-sentinel-credentials
+          userKey: username
+          passwordKey: password
       valkeyReplicationConfig:
         name: vk-restored-ha-repl
         size: 3
-      persistence:
-        storageSize: ${STORAGE_SIZE}
-        rdb:
-          entries:
-            - seconds: "900"
-              changes: "1"
-      acl:
-        secret:
-          secretName: vk-restored-ha-repl-acl-secret
+        acl:
+          secret:
+            secretName: vk-restored-ha-repl-acl-secret
+        persistence:
+          storageSize: ${STORAGE_SIZE}
+          rdb:
+            entries:
+              - seconds: "900"
+                changes: "1"
       kubernetesConfig:
         imagePullSecrets: [{name: valkey-registry-secret}]
         valkeySecret:

@@ -30,9 +30,6 @@ health-check.sh
 
 Write down: **primary pod**, **node**, **config-epoch**.
 
-> If you enabled Sentinel auth in module 5, the client pod must know about it. Recreate it with `SENTINEL_AUTH=true` exported:
-> `client_env && kubectl delete pod valkey-client -n $VALKEY_NS && render manifests/06-tools/02-valkey-client-pod.yaml | kubectl apply -f -`
-
 ## 9.2 Lab 1: planned (manual) failover
 
 `SENTINEL FAILOVER` forces a failover **without** waiting for failure detection or asking the other Sentinels to agree. Use it for maintenance, to move the writer off a node, or to test client behaviour.
@@ -116,7 +113,7 @@ Observe:
 
 ## 9.5 Lab 4: node maintenance (drain) done right
 
-Draining a node that hosts the primary evicts it. PodDisruptionBudgets limit how many Valkey and Sentinel pods may be evicted at once.
+Draining a node that hosts the primary evicts it. PodDisruptionBudgets limit how many Valkey and Sentinel pods may be evicted at once. The Sentinel pods are protected by the workshop PDB `vk-sentinel-sentinel-pods`, because the operator's `vk-sentinel` PDB selects no pods on 3.5.1 (module 3.6).
 
 Look at the PDBs first:
 

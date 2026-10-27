@@ -191,13 +191,14 @@ Valkey Admin and Valkey Commander (module 6) show the same topology graphically.
 ## 4.6 Exercise
 
 1. Write down the current primary pod, its node and its zone.
-2. Compare `SENTINEL get-master-addr-by-name` with the pod IP of the pod that reports `role:master`. Do they match?
+2. Compare `SENTINEL get-master-addr-by-name` with the pod that reports `role:master`. Do they match? (Sentinel announces **hostnames**, such as `vk-repl-0.vk-repl-headless.valkey-workshop.svc.cluster.local`, not pod IPs.)
 3. Run `scli SENTINEL master $MASTER_GROUP` and note `config-epoch`. You will compare it after the failover lab.
 4. Run the same Sentinel query against **each** Sentinel pod. All three should agree:
 
    ```bash
    for s in $(sentinel_pods); do
-     kubectl exec -n "$VALKEY_NS" "$s" -- valkey-cli -p 26379 SENTINEL get-master-addr-by-name "$MASTER_GROUP" | head -1
+     kubectl exec -n "$VALKEY_NS" "$s" -- valkey-cli -p 26379 -a "$SENTINEL_PASSWORD" --no-auth-warning \
+       SENTINEL get-master-addr-by-name "$MASTER_GROUP" | head -1
    done
    ```
 

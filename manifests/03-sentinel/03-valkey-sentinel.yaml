@@ -18,19 +18,19 @@ spec:
     downAfterMilliseconds: "5000"    # workshop value; default 30000. Tune for prod!
     failoverTimeout: "60000"         # default 180000
     parallelSyncs: "1"               # replicas re-syncing to a new primary at once
-  podDisruptionBudget:               # PDB for the Sentinel pods (minAvailable defaults to quorum)
-    enabled: true
-  affinity:                          # spread Sentinel pods across worker nodes
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            topologyKey: kubernetes.io/hostname
-            labelSelector:
-              matchExpressions:
-                - key: app
-                  operator: In
-                  values: ["${SENTINEL_NAME}-sentinel", "${SENTINEL_NAME}"]
+    sentinelSecret:                  # protects the Sentinel API + Sentinel-to-Sentinel auth
+      name: ${SENTINEL_NAME}-sentinel-credentials
+      userKey: username
+      passwordKey: password
+  podDisruptionBudget:               # operator PDB; on 3.5.1 its selector matches no pods,
+    enabled: true                    # see 04-sentinel-pdb.yaml
+  affinity:                          # REQUIRED: one Sentinel per worker node, so losing or
+    podAntiAffinity:                 # draining one node can never take out two Sentinels
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              app: ${SENTINEL_NAME}-sentinel
 
   # ---- Data tier (ValkeyReplication managed through Sentinel) -------------
   valkeyReplicationConfig:
@@ -50,24 +50,26 @@ spec:
                   - key: app
                     operator: In
                     values: ["${REPL_NAME}"]
-
-  # ---- Persistence (required for backups and version upgrades) --------------
-  persistence:
-    storageSize: ${STORAGE_SIZE}
-    # Uses the cluster's default StorageClass (see docs/01-prerequisites.md).
-    rdb:
-      entries:
-        - seconds: "900"
-          changes: "1"
-        - seconds: "300"
-          changes: "10"
-        - seconds: "60"
-          changes: "10000"
+    # ACL file for the DATA pods only (named users, least privilege).
+    # Keep it here, not in the top-level spec.acl (see 02-acl-secret.yaml).
+    acl:
+      secret:
+        secretName: ${REPL_NAME}-acl-secret
+    # Persistence (required for backups and version upgrades).
+    # spec.persistence (top level) is deprecated in 3.5.1.
+    persistence:
+      storageSize: ${STORAGE_SIZE}
+      # Uses the cluster's default StorageClass (see docs/01-prerequisites.md).
+      rdb:
+        entries:
+          - seconds: "900"
+            changes: "1"
+          - seconds: "300"
+            changes: "10"
+          - seconds: "60"
+            changes: "10000"
 
   # ---- Security ---------------------------------------------------------------
-  acl:
-    secret:
-      secretName: ${REPL_NAME}-acl-secret
   kubernetesConfig:
     serviceType: ${SERVICE_TYPE}
     imagePullSecrets:

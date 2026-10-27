@@ -1,5 +1,6 @@
 # After promotion: restore automatic failover on the DR site by wrapping the
 # promoted ValkeyReplication with a new ValkeySentinel.
+# ACL and persistence sit under valkeyReplicationConfig (see module 3, rule 4).
 apiVersion: data.tanzu.vmware.com/v1
 kind: ValkeySentinel
 metadata:
@@ -12,20 +13,24 @@ spec:
   valkeySentinelConfig:
     quorum: "2"
     downAfterMilliseconds: "5000"
+    sentinelSecret:
+      name: vk-sentinel-dr-sentinel-credentials
+      userKey: username
+      passwordKey: password
   valkeyReplicationConfig:
     name: vk-repl-dr                  # the existing (promoted) replication instance
     size: 2
-  persistence:
-    storageSize: ${STORAGE_SIZE}
-    rdb:
-      entries:
-        - seconds: "900"
-          changes: "1"
-        - seconds: "300"
-          changes: "10"
-  acl:
-    secret:
-      secretName: vk-repl-dr-acl-secret
+    acl:
+      secret:
+        secretName: vk-repl-dr-acl-secret
+    persistence:
+      storageSize: ${STORAGE_SIZE}
+      rdb:
+        entries:
+          - seconds: "900"
+            changes: "1"
+          - seconds: "300"
+            changes: "10"
   kubernetesConfig:
     imagePullSecrets: [{name: valkey-registry-secret}]
     valkeySecret:

@@ -1,19 +1,16 @@
 #!/bin/sh
 # Shared settings for scripts that run INSIDE the valkey-client pod.
 # Env vars injected by the pod spec: SENTINEL_HOST, MASTER_GROUP, VALKEY_USER,
-# VALKEY_PASSWORD, SENTINEL_PASSWORD (optional), VALKEY_TLS (optional)
+# VALKEY_PASSWORD, SENTINEL_PASSWORD, ADMIN_PASSWORD, VALKEY_TLS (optional)
 SENTINEL_PORT="${SENTINEL_PORT:-26379}"
 TLS_FLAGS=""
 [ "${VALKEY_TLS:-false}" = "true" ] && TLS_FLAGS="--tls --insecure"
 
+# Sentinel is protected by its own password (sentinelSecret), separate from the
+# data-node ACL users.
 sentinel_cli() {
-  if [ -n "${SENTINEL_PASSWORD:-}" ] && [ "${SENTINEL_AUTH:-false}" = "true" ]; then
-    # shellcheck disable=SC2086
-    valkey-cli $TLS_FLAGS -h "$SENTINEL_HOST" -p "$SENTINEL_PORT" -a "$SENTINEL_PASSWORD" --no-auth-warning "$@"
-  else
-    # shellcheck disable=SC2086
-    valkey-cli $TLS_FLAGS -h "$SENTINEL_HOST" -p "$SENTINEL_PORT" "$@"
-  fi
+  # shellcheck disable=SC2086
+  valkey-cli $TLS_FLAGS -h "$SENTINEL_HOST" -p "$SENTINEL_PORT" -a "$SENTINEL_PASSWORD" --no-auth-warning "$@"
 }
 
 # Prints "<host> <port>" of the current primary, as Sentinel sees it

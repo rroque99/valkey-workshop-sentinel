@@ -53,15 +53,13 @@ vcli() {
   fi
 }
 
-# valkey-cli against a Sentinel (port 26379).
+# valkey-cli against a Sentinel (port 26379), authenticated with the Sentinel
+# password (spec.valkeySentinelConfig.sentinelSecret -> requirepass).
 #   scli <sentinel command...>        e.g. scli SENTINEL masters
 scli() {
   local ns="${VKNS:-$VALKEY_NS}" pod
   pod="$(sentinel_pod "$ns")" || { echo "No running Sentinel pod found in $ns" >&2; return 1; }
-  set -- -p 26379 "$@"
-  if [ "${SENTINEL_AUTH}" = "true" ]; then
-    set -- -a "${SENTINEL_PASSWORD}" --no-auth-warning "$@"
-  fi
+  set -- -p 26379 -a "${SENTINEL_PASSWORD}" --no-auth-warning "$@"
   if [ "${VALKEY_TLS}" = "true" ]; then
     set -- --tls --insecure "$@"
   fi

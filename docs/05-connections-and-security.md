@@ -61,7 +61,9 @@ echo "$SENTINEL_HOST"
 
 ## 5.3 Configuring Sentinel-aware applications
 
-Applications need **four** things: the Sentinel endpoints, the master group name, a username and a password. They must **not** be configured with a fixed primary host.
+Applications need **five** things: the Sentinel endpoints, the master group name, the **Sentinel password** (`sentinelSecret`), and a **data** username and password (an ACL user such as `appuser`). They must **not** be configured with a fixed primary host.
+
+> The two credentials are independent. The Sentinel password only lets the client ask Sentinel where the primary is. The ACL user decides what the client may do on the data nodes. Sentinel doesn't load the data-node ACL file, so `appuser` can't log in to Sentinel, and the Sentinel password can't log in to the data nodes.
 
 <details>
 <summary><b>Spring Boot (Lettuce): application.yaml</b></summary>
@@ -74,8 +76,8 @@ spring:
       password: ${VALKEY_PASSWORD}          # from a Kubernetes Secret
       sentinel:
         master: valkey-server
-        nodes: vk-sentinel-headless.valkey-workshop.svc.cluster.local:26379
-        # password: ${SENTINEL_PASSWORD}    # once Sentinel auth is enabled (5.5)
+        nodes: vk-sentinel-sentinel-headless.valkey-workshop.svc.cluster.local:26379
+        password: ${SENTINEL_PASSWORD}    # Sentinel password (sentinelSecret)
       timeout: 2s
       lettuce:
         pool:
@@ -90,9 +92,9 @@ spring:
 ```python
 from valkey.sentinel import Sentinel   # or: from redis.sentinel import Sentinel
 sentinel = Sentinel(
-    [("vk-sentinel-headless.valkey-workshop.svc.cluster.local", 26379)],
+    [("vk-sentinel-sentinel-headless.valkey-workshop.svc.cluster.local", 26379)],
     socket_timeout=1.0,
-    sentinel_kwargs={"password": SENTINEL_PASSWORD},   # once Sentinel auth is enabled
+    sentinel_kwargs={"password": SENTINEL_PASSWORD},   # Sentinel password (sentinelSecret)
 )
 primary = sentinel.master_for("valkey-server", username="appuser", password=APP_PASSWORD, socket_timeout=1.0)
 replica = sentinel.slave_for("valkey-server", username="appuser", password=APP_PASSWORD)
@@ -107,7 +109,7 @@ print(replica.get("app:greeting"))
 ```go
 rdb := redis.NewFailoverClient(&redis.FailoverOptions{
     MasterName:       "valkey-server",
-    SentinelAddrs:    []string{"vk-sentinel-headless.valkey-workshop.svc.cluster.local:26379"},
+    SentinelAddrs:    []string{"vk-sentinel-sentinel-headless.valkey-workshop.svc.cluster.local:26379"},
     Username:         "appuser",
     Password:         os.Getenv("VALKEY_PASSWORD"),
     SentinelPassword: os.Getenv("SENTINEL_PASSWORD"),
@@ -121,7 +123,7 @@ rdb := redis.NewFailoverClient(&redis.FailoverOptions{
 ```js
 const Redis = require("ioredis");
 const client = new Redis({
-  sentinels: [{ host: "vk-sentinel-headless.valkey-workshop.svc.cluster.local", port: 26379 }],
+  sentinels: [{ host: "vk-sentinel-sentinel-headless.valkey-workshop.svc.cluster.local", port: 26379 }],
   name: "valkey-server",
   username: "appuser",
   password: process.env.VALKEY_PASSWORD,
@@ -204,45 +206,48 @@ done
 
 ⚠️ **Caution:** rotating the **`default` / `valkeySecret`** password also affects the operator, Sentinel and replication. Update `vk-repl-credentials` **and** the ACL secret together, then follow the same rolling procedure. Test it in a non-production environment first.
 
-## 5.5 Lab: protect the Sentinel API
+## 5.5 Lab: how the Sentinel tier is secured
 
-Right now anyone who can reach port 26379 can run `SENTINEL FAILOVER` or `SENTINEL REMOVE`. Lock it down with `spec.valkeySentinelConfig.sentinelSecret`.
+Module 3 already protected Sentinel with `spec.valkeySentinelConfig.sentinelSecret`. Here you verify how the three credentials fit together.
 
 | Setting | Protects | Operator maps it to |
 |---------|----------|---------------------|
-| `spec.valkeySentinelConfig.sentinelSecret` | the Sentinel API itself | `requirepass`, `sentinel sentinel-user/sentinel-pass` |
-| `spec.kubernetesConfig.valkeySecret` | Sentinel's login to Valkey nodes | `sentinel auth-user/auth-pass` |
+| `spec.valkeySentinelConfig.sentinelSecret` | the Sentinel API, and Sentinel ↔ Sentinel traffic | `requirepass`, `sentinel sentinel-user/sentinel-pass` |
+| `spec.kubernetesConfig.valkeySecret` | Sentinel's login to the Valkey data nodes | `sentinel auth-user/auth-pass` |
+| `spec.valkeyReplicationConfig.acl` | the data nodes (named users) | `aclfile` on the **data** pods only |
 
-⚠️ Mixing up these two secrets is the most common Sentinel auth failure in the Broadcom troubleshooting guide.
+⚠️ Mixing up `sentinelSecret` and `valkeySecret` is the most common Sentinel auth failure in the Broadcom troubleshooting guide.
 
-```bash
-render manifests/05-security/01-sentinel-credentials-secret.yaml | kubectl apply -f -
-patch-sentinel.sh manifests/05-security/02-sentinel-auth-patch.yaml
-kubectl get pods -n "${VALKEY_NS}" -w      # Sentinel pods restart
-```
-
-Verify:
+Look at the generated Sentinel configuration (passwords masked):
 
 ```bash
-kubectl exec -n "$VALKEY_NS" "$(sentinel_pod)" -- valkey-cli -p 26379 SENTINEL masters
-# -> NOAUTH / authentication required
-
-export SENTINEL_AUTH=true          # tell the helper functions to authenticate
-scli SENTINEL ckquorum "${MASTER_GROUP}"
+kubectl exec -n "$VALKEY_NS" "$(sentinel_pod)" -- \
+  grep -E 'requirepass|sentinel-user|sentinel-pass|auth-user|auth-pass|aclfile' /opt/toss/valkey/etc/sentinel.conf \
+  | sed -E 's/(pass[a-z-]*|requirepass) .*/\1 ****/'
+# requirepass ****, sentinel sentinel-user "default", sentinel sentinel-pass ****,
+# sentinel auth-user valkey-server "default", sentinel auth-pass ****   (no aclfile)
 ```
 
-🔎 **Check:** unauthenticated access is refused, `scli` (authenticated) works, and `ckquorum` is `OK`.
+Prove each credential works only where it should:
 
-Make it permanent for new terminals by setting `export SENTINEL_AUTH="${SENTINEL_AUTH:-true}"` in `env.sh`.
+```bash
+S="kubectl exec -n $VALKEY_NS $(sentinel_pod) -- valkey-cli -p 26379 --no-auth-warning"
+$S PING                                                            # -> NOAUTH (API protected)
+$S -a "$SENTINEL_PASSWORD" PING                                    # -> PONG
+$S --user appuser --pass "$VALKEY_APP_PASSWORD" PING               # -> WRONGPASS (ACL users don't exist on Sentinel)
+scli SENTINEL sentinels "${MASTER_GROUP}" | paste - - | grep -E '^(ip|flags)\s'   # peers: flags sentinel (no s_down)
+scli SENTINEL ckquorum "${MASTER_GROUP}"                          # -> OK 3 usable Sentinels
+```
 
-> If Sentinel pods fail to start after this change, check their logs (module 8) for ACL or auth errors, and revert with:
-> `kubectl patch valkeysentinel $SENTINEL_NAME -n $VALKEY_NS --type json -p '[{"op":"remove","path":"/spec/valkeySentinelConfig/sentinelSecret"}]'`
+🔎 **Check:** unauthenticated access is refused, the Sentinel password works, ACL users are rejected by Sentinel, and the peers are healthy (`flags sentinel`, `ckquorum` OK).
+
+🧠 **Operator insight:** Sentinel peer authentication is invisible until it breaks. Every pod is `Running`, but `ckquorum` reports `NOQUORUM` and failover silently can't happen. Add `SENTINEL ckquorum` to your health checks (`health-check.sh` does) and alert on it.
 
 ## 5.6 External access with a LoadBalancer: the Sentinel caveat
 
 Setting `spec.kubernetesConfig.serviceType: LoadBalancer` ([`07-loadbalancer-patch.yaml`](../manifests/05-security/07-loadbalancer-patch.yaml)) gives the services an external IP (NSX/Avi on VKS, a cloud LB elsewhere).
 
-But Sentinel returns the primary's **internal** address. An external Sentinel-aware client asks Sentinel through the LB, receives a pod IP such as `10.244.2.15`, and cannot reach it. Your options:
+But Sentinel returns the primary's **internal** address (the pod DNS name, for example `vk-repl-0.vk-repl-headless.valkey-workshop.svc.cluster.local`). An external Sentinel-aware client asks Sentinel through the LB, receives that internal name, and cannot reach it. Your options:
 
 | Option | When |
 |--------|------|
@@ -344,7 +349,7 @@ flowchart LR
 - [ ] `default` user has a strong password (or is disabled), so protected mode never blocks platform traffic
 - [ ] Separate users for platform, humans, applications and read-only monitoring
 - [ ] Application users restricted by key pattern and command categories (`-@dangerous`, no `FLUSHALL`/`CONFIG`/`DEBUG`)
-- [ ] Sentinel API protected (`sentinelSecret`)
+- [ ] Sentinel API protected (`sentinelSecret`), ACL file scoped to the data pods (`valkeyReplicationConfig.acl`), `SENTINEL ckquorum` monitored
 - [ ] Secrets sourced from a secrets manager; rotation procedure tested
 - [ ] NetworkPolicy restricts who can reach 6379/26379
 - [ ] TLS enabled for traffic crossing node/zone or trust boundaries; certificate expiry monitored

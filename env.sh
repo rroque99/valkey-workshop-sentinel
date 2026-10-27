@@ -71,13 +71,11 @@ export VALKEY_DEFAULT_PASSWORD="$(cat "${WORKSHOP_HOME}/.secrets/default")"    #
 export VALKEY_ADMIN_PASSWORD="$(cat "${WORKSHOP_HOME}/.secrets/admin")"        # human operators
 export VALKEY_APP_PASSWORD="$(cat "${WORKSHOP_HOME}/.secrets/app")"            # application user
 export VALKEY_MONITOR_PASSWORD="$(cat "${WORKSHOP_HOME}/.secrets/monitor")"    # read-only troubleshooting user
-export SENTINEL_PASSWORD="$(cat "${WORKSHOP_HOME}/.secrets/sentinel")"         # Sentinel API (module 05)
+export SENTINEL_PASSWORD="$(cat "${WORKSHOP_HOME}/.secrets/sentinel")"         # Sentinel API + Sentinel peers (sentinelSecret, module 03)
 export COMMANDER_PASSWORD="$(cat "${WORKSHOP_HOME}/.secrets/commander")"       # Valkey Commander login
 export MINIO_ROOT_PASSWORD="$(cat "${WORKSHOP_HOME}/.secrets/minio")"          # MinIO (backup target)
 export GRAFANA_ADMIN_PASSWORD="$(cat "${WORKSHOP_HOME}/.secrets/grafana")"     # Grafana admin
 
-# Set to "true" after you enable Sentinel authentication in module 05
-export SENTINEL_AUTH="${SENTINEL_AUTH:-false}"
 # Set to "true" after you enable TLS in module 05 (optional lab)
 export VALKEY_TLS="${VALKEY_TLS:-false}"
 
@@ -87,7 +85,7 @@ export WORKSHOP_VARS="REGISTRY_SERVER OPERATOR_NS OPERATOR_VERSION CLUSTER_DOMAI
 SENTINEL_NAME REPL_NAME MASTER_GROUP VALKEY_VERSION VALKEY_TARGET_VERSION STORAGE_SIZE SERVICE_TYPE \
 MONITORING_NS MINIO_NS BACKUP_BUCKET DR_NS VALKEY_DEFAULT_PASSWORD VALKEY_ADMIN_PASSWORD \
 VALKEY_APP_PASSWORD VALKEY_MONITOR_PASSWORD SENTINEL_PASSWORD COMMANDER_PASSWORD MINIO_ROOT_PASSWORD \
-VALKEY_IMAGE DR_SOURCE_HOST SENTINEL_HOST SENTINEL_AUTH"
+VALKEY_IMAGE DR_SOURCE_HOST SENTINEL_HOST"
 
 export PATH="${WORKSHOP_HOME}/scripts:${PATH}"
 

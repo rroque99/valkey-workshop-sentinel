@@ -47,6 +47,17 @@ echo "    used_memory_human=$(echo "$mem" | awk -F: '/^used_memory_human:/{print
 
 echo "PodDisruptionBudgets"
 kubectl get pdb -n "${VALKEY_NS}" --no-headers 2>/dev/null | sed 's/^/    /'
+# A PDB whose selector matches no pods protects nothing (operator 3.5.1 Sentinel PDB, see module 3)
+for pdb in $(kubectl get pdb -n "${VALKEY_NS}" -o jsonpath='{range .items[?(@.status.expectedPods==0)]}{.metadata.name}{" "}{end}' 2>/dev/null); do
+  warn "PDB ${pdb} selects no pods (protects nothing)"
+done
+spdb="$(kubectl get pdb -n "${VALKEY_NS}" -o jsonpath="{range .items[?(@.spec.selector.matchLabels.app=='${SENTINEL_NAME}-sentinel')]}{.metadata.name}{\" \"}{.status.expectedPods}{\" \"}{.status.disruptionsAllowed}{\"\\n\"}{end}" 2>/dev/null | head -1)"
+if [ -n "$spdb" ]; then
+  set -- $spdb
+  [ "${2:-0}" -ge 3 ] && ok "Sentinel pods protected by PDB $1 (pods=$2, allowed disruptions=$3)" || bad "Sentinel PDB $1 covers ${2:-0} pods (expect 3)"
+else
+  bad "no PDB selects the Sentinel pods (app=${SENTINEL_NAME}-sentinel); apply manifests/03-sentinel/04-sentinel-pdb.yaml"
+fi
 
 echo
 [ $rc -eq 0 ] && echo "RESULT: HEALTHY" || echo "RESULT: ATTENTION REQUIRED"

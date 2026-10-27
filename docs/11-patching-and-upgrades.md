@@ -216,7 +216,8 @@ Upgrading a VKS cluster to a new Kubernetes release replaces nodes in a rolling 
 **Before the upgrade:**
 
 - [ ] `health-check.sh` green; 3 data pods and 3 Sentinels spread over ≥ 3 nodes
-- [ ] PDBs show `ALLOWED DISRUPTIONS ≥ 1` (`kubectl get pdb -n $VALKEY_NS`). A PDB stuck at 0 blocks the drain, and the upgrade hangs
+- [ ] PDBs that select pods show `ALLOWED DISRUPTIONS ≥ 1` (`kubectl get pdb -n $VALKEY_NS`). A PDB stuck at 0 blocks the drain, and the upgrade hangs. The operator's `vk-sentinel` PDB always shows 0 because it selects no pods on 3.5.1; it doesn't block anything, and it doesn't protect anything either
+- [ ] The Sentinel pods are covered by a PDB that actually selects them (`vk-sentinel-sentinel-pods`, module 3.6), and each Sentinel is on a different node
 - [ ] Spare capacity for the surge node (anti-affinity needs room to reschedule)
 - [ ] Persistent volumes can attach to the replacement nodes (same zone / datastore)
 - [ ] The operator and applications are compatible with the target Kubernetes version

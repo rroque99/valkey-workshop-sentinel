@@ -171,7 +171,8 @@ kubectl get pods -n "${VALKEY_NS}" -o custom-columns='POD:.metadata.name,RESTART
 | `DENIED Running in protected mode` | ACL active, `default` without password | give `default` a password or disable it |
 | Sentinel: `-failover-abort-no-good-slave` | no replica eligible (all down, lagging or priority 0) | check replicas, `slave-priority` |
 | Sentinel: auth errors to the primary | `valkeySecret` wrong or user missing in ACL | align the secret and ACL (not `sentinelSecret`) |
-| Sentinel: `Unknown command or category name` | custom ACL category in the Sentinel ACL | use built-in categories only (`+@all`, `+@admin`) |
+| Sentinel: `Aborting Valkey startup because of ACL errors … Unknown command or category name` | the data-node ACL file is mounted into Sentinel (top-level `spec.acl`) | reference the ACL from `valkeyReplicationConfig.acl` (module 3, rule 4) |
+| Sentinel: `+sdown sentinel <id> …` right after `+sentinel` | Sentinels can't authenticate to each other: `ckquorum` → `NOQUORUM` | set `sentinelSecret`; ACL under `valkeyReplicationConfig.acl` |
 | `MISCONF … unable to persist to disk` | RDB save failing, so writes are refused | PVC full or read-only; check `df` and events |
 | `Can't save in background: fork: Cannot allocate memory` | not enough memory headroom to fork | raise the limit, lower maxmemory |
 | `Client … closed for overcoming of output buffer limits` | slow replica/subscriber | check the network, `client-output-buffer-limit` |

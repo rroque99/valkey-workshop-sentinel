@@ -1,0 +1,21 @@
+# Workshop-managed PodDisruptionBudget for the Sentinel pods.
+#
+# Why: with podDisruptionBudget.enabled, operator 3.5.1 creates a PDB named
+# <sentinel-name> whose selector is app=<sentinel-name>, but the Sentinel pods
+# are labelled app=<sentinel-name>-sentinel. That PDB matches no pods, so it
+# does not stop a drain or a node-pool upgrade from evicting several Sentinels
+# at once (losing quorum). This PDB selects the real Sentinel pods.
+# Remove it once the operator's PDB selects the Sentinel pods (check with:
+#   kubectl get pdb -n <ns> -o custom-columns=NAME:.metadata.name,EXPECTED:.status.expectedPods).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ${SENTINEL_NAME}-sentinel-pods
+  namespace: ${VALKEY_NS}
+  labels:
+    workshop: valkey-sentinel
+spec:
+  minAvailable: 2                    # = quorum: never evict below what a failover needs
+  selector:
+    matchLabels:
+      app: ${SENTINEL_NAME}-sentinel

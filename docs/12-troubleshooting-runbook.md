@@ -83,10 +83,11 @@ flowchart TD
 | Replication lag growing | dashboard; `INFO replication` offsets | replica CPU/network starved; big writes; full sync in progress |
 | Two primaries (`ValkeyMultiplePrimaries`) | `topology.sh`, Sentinel logs, network events | partition; Sentinels on the majority side are authoritative; the old primary is demoted on heal; investigate the network; consider `min-replicas-to-write` |
 | `ckquorum` fails | `scli SENTINEL sentinels`, Sentinel pod status | restore Sentinel pods; check anti-affinity (all on one node?) |
+| `ckquorum` → `NOQUORUM` although all Sentinel pods are Running | `scli SENTINEL sentinels` shows peers `s_down`; Sentinel logs `+sdown sentinel …` shortly after `+sentinel` | Sentinels can't authenticate to each other. Make sure `valkeySentinelConfig.sentinelSecret` is set and the ACL is under `valkeyReplicationConfig.acl`, not the top-level `spec.acl` (module 3, rule 4) |
 | Sentinels disagree on the primary | query each Sentinel (module 4 exercise) | wait for convergence after failover; Sentinel auth issues between peers; only `SENTINEL RESET` as a last resort |
 | Unexpected failovers (flapping) | Sentinel logs `+sdown` timing; node events; GC/fork | `downAfterMilliseconds` too low; CPU throttling of the primary; noisy node; large BGSAVE fork pauses |
 | Sentinel auth failures to Valkey | Sentinel logs | `valkeySecret` (Sentinel → Valkey) vs `sentinelSecret` (Sentinel API) mixed up |
-| Sentinel won't load ACL | `Unknown command or category name` | only built-in ACL categories in the Sentinel ACL |
+| Sentinel won't start: `Aborting Valkey startup because of ACL errors … Unknown command or category name` | Sentinel logs | the data-node ACL file is mounted into Sentinel (top-level `spec.acl`). Move it to `valkeyReplicationConfig.acl` (module 3, rule 4) |
 | `+tilt` in Sentinel logs | Sentinel process paused / clock jump | node CPU starvation or VM stun; check node health |
 
 ## 12.6 Performance: latency, CPU, memory

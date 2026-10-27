@@ -281,7 +281,7 @@ render manifests/10-backup-dr/12-dr-sentinel.yaml | $DRK apply -f -
 $DRK get valkeysentinel,valkeyreplication,pods -n "${DR_NS}"
 ```
 
-4. Repoint applications to the DR Sentinel (`<vk-sentinel-dr headless svc>.${DR_NS}.svc:26379`, master group `valkey-server`) through DNS, config or service bindings.
+4. Repoint applications to the DR Sentinel (`vk-sentinel-dr-sentinel-headless.${DR_NS}.svc:26379`, master group `valkey-server`) through DNS, config or service bindings.
 
 ### Failback (overview)
 

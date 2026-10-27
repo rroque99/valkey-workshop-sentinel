@@ -1,8 +1,0 @@
-# Merge-patch for the ValkeySentinel CR: enable Sentinel authentication.
-#   patch-sentinel.sh manifests/05-security/02-sentinel-auth-patch.yaml
-spec:
-  valkeySentinelConfig:
-    sentinelSecret:
-      name: ${SENTINEL_NAME}-sentinel-credentials
-      userKey: username
-      passwordKey: password

@@ -37,8 +37,6 @@ spec:
           valueFrom: {secretKeyRef: {name: valkey-client-credentials, key: admin-password}}
         - name: SENTINEL_PASSWORD
           valueFrom: {secretKeyRef: {name: valkey-client-credentials, key: sentinel-password}}
-        - name: SENTINEL_AUTH
-          value: "${SENTINEL_AUTH}"   # "true" after module 05 enables Sentinel auth
       resources:
         requests: {cpu: 100m, memory: 64Mi}
         limits: {cpu: "1", memory: 256Mi}
