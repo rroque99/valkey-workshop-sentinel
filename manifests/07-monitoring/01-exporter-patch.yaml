@@ -1,10 +1,14 @@
 # Merge-patch for the ValkeySentinel CR: enable the Prometheus exporter sidecar
-# (HTTPS on port 9121, path /metrics) in every Valkey data pod.
-# Field name per the property reference: spec.valkeyExporter
-#   kubectl explain valkeysentinel.spec.valkeyExporter
+# (plain HTTP on port 9121, path /metrics) in every Valkey data pod.
+#   - The exporter switch lives under spec.valkeyReplicationConfig.valkeyExporter.
+#     The top-level spec.valkeyExporter is deprecated on 3.5.1 (admission warning).
+#       kubectl explain valkeysentinel.spec.valkeyReplicationConfig.valkeyExporter
+#   - Exporter CPU/memory stay at spec.resources.exporter
+#     (valkeyReplicationConfig has no resources field).
 spec:
-  valkeyExporter:
-    enabled: true
+  valkeyReplicationConfig:
+    valkeyExporter:
+      enabled: true
   resources:
     exporter:
       requests:

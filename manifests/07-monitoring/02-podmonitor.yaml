@@ -1,6 +1,8 @@
 # Scrape every pod that exposes a container port named "metrics" in the Valkey
 # namespaces. Based on the PodMonitor in the Broadcom monitoring docs:
 # https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-for-valkey-on-kubernetes/3-5/valkey-on-kubernetes/monitoring.html
+# The docs use scheme: https + insecureSkipVerify. On operator 3.5.1 (instance
+# without TLS) the exporter serves plain HTTP on 9121, so this uses scheme: http.
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
@@ -22,9 +24,7 @@ spec:
     - port: metrics
       path: /metrics
       interval: 10s
-      scheme: https
-      tlsConfig:
-        insecureSkipVerify: true   # exporter uses an operator-managed certificate
+      scheme: http
       relabelings:
         - sourceLabels: [__meta_kubernetes_pod_node_name]
           targetLabel: node

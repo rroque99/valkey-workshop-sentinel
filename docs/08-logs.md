@@ -183,6 +183,10 @@ kubectl get pods -n "${VALKEY_NS}" -o custom-columns='POD:.metadata.name,RESTART
 In production, ship logs to the platform your organisation already uses (Splunk, Elastic, Loki, Aria Operations for Logs, …). On VKS, the **Fluent Bit standard package** is a common forwarder. For the lab, install **Loki** (single binary) plus **Grafana Alloy**, which tails pod logs through the Kubernetes API with no hostPath mounts, so it is PSA-friendly.
 
 ```bash
+# Chart repository (also in module 1.6; safe to re-run)
+helm repo add grafana https://grafana.github.io/helm-charts --force-update
+helm repo update grafana
+
 helm upgrade --install loki grafana/loki -n "${MONITORING_NS}" \
   -f manifests/08-logging/loki-values.yaml --wait --timeout 10m
 helm upgrade --install alloy grafana/alloy -n "${MONITORING_NS}" \

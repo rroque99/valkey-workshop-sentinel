@@ -63,24 +63,24 @@
         "name": "prefix",
         "label": "Metric prefix",
         "type": "custom",
-        "query": "valkey,redis",
+        "query": "redis,valkey",
         "current": {
-          "text": "valkey",
-          "value": "valkey"
+          "text": "redis",
+          "value": "redis"
         },
         "options": [
           {
-            "text": "valkey",
-            "value": "valkey",
+            "text": "redis",
+            "value": "redis",
             "selected": true
           },
           {
-            "text": "redis",
-            "value": "redis",
+            "text": "valkey",
+            "value": "valkey",
             "selected": false
           }
         ],
-        "description": "Exporter metric prefix. Pick the one your exporter exposes."
+        "description": "Exporter metric prefix. Tanzu Valkey 3.5.1 (exporter v1.82.0) uses redis; pick valkey for builds that use that prefix."
       },
       {
         "name": "namespace",

@@ -15,7 +15,7 @@ flowchart LR
     subgraph vns["valkey-workshop"]
         subgraph pod["vk-repl-N"]
             V["valkey :6379"]
-            E["exporter :9121<br/>HTTPS /metrics"]
+            E["exporter :9121<br/>HTTP /metrics"]
             E -->|"INFO, CONFIG, SLOWLOG…"| V
         end
     end
@@ -60,6 +60,10 @@ kubectl create namespace "${MONITORING_NS}" --dry-run=client -o yaml | kubectl a
 # node-exporter needs host access: allow it in this namespace only (VKS / PSA clusters)
 kubectl label ns "${MONITORING_NS}" pod-security.kubernetes.io/enforce=privileged --overwrite
 
+# Chart repository (also in module 1.6; safe to re-run)
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
+helm repo update prometheus-community
+
 helm upgrade --install kps prometheus-community/kube-prometheus-stack \
   -n "${MONITORING_NS}" \
   -f manifests/07-monitoring/kube-prometheus-stack-values.yaml \
@@ -75,13 +79,17 @@ kubectl get pods,svc -n "${MONITORING_NS}"
 
 ## 7.3 Enable the Valkey exporter
 
-The exporter is a sidecar that queries Valkey (`INFO` and friends) and serves Prometheus metrics over **HTTPS on port 9121** at `/metrics`.
+The exporter is a sidecar that queries Valkey (`INFO` and friends) and serves Prometheus metrics on **port 9121** at `/metrics`.
+
+> ⚠️ The Broadcom monitoring page describes an **HTTPS** endpoint and a PodMonitor with `scheme: https`. On operator 3.5.1 (instance without TLS) the exporter serves **plain HTTP**: `curl https://…:9121` gets no response, `curl http://…:9121` returns the metrics. The workshop uses `http` throughout. If you enable instance TLS (module 5.8), check again.
 
 ```bash
-kubectl explain valkeysentinel.spec.valkeyExporter       # confirm the field name for your version
+kubectl explain valkeysentinel.spec.valkeyReplicationConfig.valkeyExporter   # confirm the field for your version
 patch-sentinel.sh manifests/07-monitoring/01-exporter-patch.yaml
 kubectl get pods -n "${VALKEY_NS}" -w                     # rolling restart of the data pods
 ```
+
+> The exporter switch goes under `spec.valkeyReplicationConfig.valkeyExporter`; the top-level `spec.valkeyExporter` still works on 3.5.1 but the operator warns that it's deprecated. Exporter CPU/memory stay at `spec.resources.exporter`. The patch also prints the usual `valkeySecret and spec.acl are both set` warning (harmless, module 6.7).
 
 ⚠️ This restarts the data pods, including the primary, so expect a failover. In production, enable the exporter when you create the instance.
 
@@ -92,24 +100,24 @@ P=$(repl_pods | head -1)
 kubectl get pod "$P" -n "${VALKEY_NS}" -o jsonpath='{range .spec.containers[*]}{.name}{" ports="}{.ports[*].name}{"/"}{.ports[*].containerPort}{"\n"}{end}'
 
 kubectl port-forward -n "${VALKEY_NS}" "pod/$P" 9121:9121 &
-sleep 2; curl -sk https://localhost:9121/metrics | head -20
+sleep 2; curl -s http://localhost:9121/metrics | head -20
 ```
 
 ### Discover the metric names
 
-Different exporter builds use different metric prefixes (`valkey_…` or `redis_…`). Check yours:
+The exporter is based on the upstream `redis_exporter`, and the Broadcom docs don't state the metric prefix. The Tanzu Valkey 3.5.1 exporter (v1.82.0) uses **`redis_…`** (`redis_up`, `redis_instance_info`, …), and the workshop's alert rules and dashboard default to it. Check yours:
 
 ```bash
-curl -sk https://localhost:9121/metrics | grep -E '^(valkey|redis)_' | sed 's/[{ ].*//' | sort -u | head -80
+curl -s http://localhost:9121/metrics | grep -E '^(valkey|redis)_' | sed 's/[{ ].*//' | sort -u | head -80
 kill %1
 ```
 
-- If the names start with **`valkey_`**, you're done (the alert rules default to it).
-- If they start with **`redis_`**, run `switch-metric-prefix.sh redis`. The Grafana dashboard has a **Metric prefix** drop-down, so it needs no change.
+- If the names start with **`redis_`**, you're done.
+- If they start with **`valkey_`** (other exporter builds), run `switch-metric-prefix.sh valkey` and pick **Metric prefix** = `valkey` in the Grafana dashboard.
 
 ## 7.4 Scrape with a PodMonitor
 
-[`02-podmonitor.yaml`](../manifests/07-monitoring/02-podmonitor.yaml) is based on the PodMonitor in the Broadcom monitoring docs: HTTPS, `insecureSkipVerify` (operator-managed exporter certificate), 10 s interval. It's also generalised to select every pod with a `metrics` port in the Valkey namespaces, and it adds a `node` label so dashboards can show placement.
+[`02-podmonitor.yaml`](../manifests/07-monitoring/02-podmonitor.yaml) is based on the PodMonitor in the Broadcom monitoring docs (10 s interval), but uses `scheme: http` because the 3.5.1 exporter serves plain HTTP (the docs show `https` with `insecureSkipVerify`). It's also generalised to select every pod with a `metrics` port in the Valkey namespaces, and it adds a `node` label so dashboards can show placement.
 
 ```bash
 kubectl get crd podmonitors.monitoring.coreos.com
@@ -123,7 +131,7 @@ kubectl port-forward -n "${MONITORING_NS}" svc/kps-prometheus 9090:9090
 # http://localhost:9090/targets  ->  podMonitor/monitoring/tanzu-valkey-instances/0  (3/3 up)
 ```
 
-🔎 **Check:** in the Prometheus UI, query `valkey_up` (or `redis_up`): three series with value `1`.
+🔎 **Check:** in the Prometheus UI, query `redis_up`: three series with value `1`.
 
 Not up? Run through this list:
 
@@ -131,7 +139,7 @@ Not up? Run through this list:
 |---------|-----|
 | No target at all | port name isn't `metrics` (check 7.3), or the namespace isn't in `namespaceSelector` |
 | Target down: `connection refused` / timeout | NetworkPolicy blocks 9121 from `monitoring` (module 5 policy allows it) |
-| Target down: `server returned HTTP status 400` | scheme mismatch: try `http` instead of `https` |
+| Target down: `server gave HTTP response to HTTPS client` (or HTTP 400) | scheme mismatch: the 3.5.1 exporter is plain HTTP, so use `scheme: http` (no `tlsConfig`) |
 | `*_up == 0` | exporter can't authenticate to Valkey (exporter logs: `NOAUTH`, `WRONGPASS`, protected mode) |
 
 ## 7.5 Load the Grafana dashboard
@@ -147,7 +155,7 @@ kubectl port-forward -n "${MONITORING_NS}" svc/kps-grafana 3000:80
 # http://localhost:3000   user: admin   password: $(cat .secrets/grafana)
 ```
 
-Open **Dashboards → Valkey → Tanzu Valkey - Sentinel HA Overview**. Select your namespace, and pick **Metric prefix** = `valkey` or `redis`.
+Open **Dashboards → Valkey → Tanzu Valkey - Sentinel HA Overview**. Select your namespace. **Metric prefix** defaults to `redis`; switch to `valkey` only if your exporter uses that prefix.
 
 Start load in another terminal so the graphs come alive:
 
@@ -172,13 +180,13 @@ The dashboard also shows an **annotation (red marker) every time the primary cha
 
 ## 7.6 The key metrics: what they mean and when to worry
 
-Replace `valkey_` with `redis_` if your exporter uses that prefix.
+The queries use the `redis_` prefix of the 3.5.1 exporter. Replace it with `valkey_` if your exporter uses that prefix.
 
 ### CPU utilization
 
 | PromQL | Meaning | Worry when |
 |--------|---------|------------|
-| `rate(valkey_cpu_sys_seconds_total[5m]) + rate(valkey_cpu_user_seconds_total[5m])` | cores used by the Valkey process | approaching **1.0**: the main thread is saturated, whatever the pod's CPU limit |
+| `rate(redis_cpu_sys_seconds_total[5m]) + rate(redis_cpu_user_seconds_total[5m])` | cores used by the Valkey process | approaching **1.0**: the main thread is saturated, whatever the pod's CPU limit |
 | `rate(container_cpu_cfs_throttled_periods_total[5m]) / rate(container_cpu_cfs_periods_total[5m])` | share of time throttled by the CPU limit | > 10–20 % sustained adds latency |
 
 🧠 A spike in **sys** CPU on the primary with a matching memory spike usually means a `BGSAVE` fork (RDB snapshot or a full resync for a replica).
@@ -187,22 +195,22 @@ Replace `valkey_` with `redis_` if your exporter uses that prefix.
 
 | PromQL | Meaning | Worry when |
 |--------|---------|------------|
-| `valkey_memory_used_bytes` | memory allocated by Valkey (data + overhead) | trending toward `maxmemory` or the container limit |
-| `valkey_memory_max_bytes` | `maxmemory` (0 = unlimited) | 0 in production (no protection from OOMKill) |
-| `valkey_memory_used_bytes / valkey_memory_max_bytes` | utilisation | > 90 % |
-| `valkey_memory_used_rss_bytes` | resident memory as the OS sees it | close to the container memory limit |
-| `valkey_mem_fragmentation_ratio` (some builds: `valkey_memory_fragmentation_ratio`) | RSS / used | **> 1.5** = fragmented (wasted RAM), **< 1.0** = swapping (severe) |
+| `redis_memory_used_bytes` | memory allocated by Valkey (data + overhead) | trending toward `maxmemory` or the container limit |
+| `redis_memory_max_bytes` | `maxmemory` (0 = unlimited) | 0 in production (no protection from OOMKill) |
+| `redis_memory_used_bytes / redis_memory_max_bytes` | utilisation | > 90 % |
+| `redis_memory_used_rss_bytes` | resident memory as the OS sees it | close to the container memory limit |
+| `redis_mem_fragmentation_ratio` | RSS / used | **> 1.5** = fragmented (wasted RAM), **< 1.0** = swapping (severe) |
 | `container_memory_working_set_bytes / kube_pod_container_resource_limits{resource="memory"}` | pod memory vs limit | > 90 % → OOMKill risk |
-| `rate(valkey_evicted_keys_total[5m])` | keys evicted due to maxmemory | > 0 unexpectedly (data loss for non-cache workloads) |
+| `rate(redis_evicted_keys_total[5m])` | keys evicted due to maxmemory | > 0 unexpectedly (data loss for non-cache workloads) |
 
 🧠 Fragmentation is noisy on near-empty instances (a few MB). Only act when the dataset is substantial. Remedies: `CONFIG SET activedefrag yes`, or a rolling restart (replicas first, then a failover).
 
 ### Cache hit rate
 
 ```promql
-sum(rate(valkey_keyspace_hits_total[5m]))
+sum(rate(redis_keyspace_hits_total[5m]))
 /
-(sum(rate(valkey_keyspace_hits_total[5m])) + sum(rate(valkey_keyspace_misses_total[5m])))
+(sum(rate(redis_keyspace_hits_total[5m])) + sum(rate(redis_keyspace_misses_total[5m])))
 ```
 
 What counts as "good" depends on the application: often > 90 % for caches. A sudden drop after a deploy, an eviction storm or a failover is the signal to look for.
@@ -211,36 +219,36 @@ What counts as "good" depends on the application: often > 90 % for caches. A sud
 
 | PromQL | Meaning |
 |--------|---------|
-| `rate(valkey_net_input_bytes_total[5m])` | bytes received (client writes and commands) |
-| `rate(valkey_net_output_bytes_total[5m])` | bytes sent (replies **plus** the replication stream to each replica) |
+| `rate(redis_net_input_bytes_total[5m])` | bytes received (client writes and commands) |
+| `rate(redis_net_output_bytes_total[5m])` | bytes sent (replies **plus** the replication stream to each replica) |
 | `rate(container_network_transmit_bytes_total{namespace="valkey-workshop"}[5m])` | pod network as Kubernetes sees it |
 
 ### Connections
 
 | PromQL | Meaning | Worry when |
 |--------|---------|------------|
-| `valkey_connected_clients` | open client connections | approaching `valkey_config_maxclients` |
-| `valkey_blocked_clients` | clients in blocking calls (`BLPOP`, …) | unexpected growth |
-| `rate(valkey_connections_received_total[5m])` | new connections/s | high = clients not pooling |
-| `increase(valkey_rejected_connections_total[5m])` | refused because of maxclients | **any** |
+| `redis_connected_clients` | open client connections | approaching `redis_config_maxclients` |
+| `redis_blocked_clients` | clients in blocking calls (`BLPOP`, …) | unexpected growth |
+| `rate(redis_connections_received_total[5m])` | new connections/s | high = clients not pooling |
+| `increase(redis_rejected_connections_total[5m])` | refused because of maxclients | **any** |
 
 ### Replication (HA health)
 
 | PromQL | Meaning |
 |--------|---------|
-| `valkey_instance_info{role="master"}` | which pod is the primary (exactly one) |
-| `valkey_connected_slaves` | replicas attached to the primary (expect 2) |
-| `valkey_master_link_up` | on replicas: link to the primary up (1) |
-| `valkey_connected_slave_lag_seconds` | per-replica lag seen by the primary |
-| `scalar(max(valkey_master_repl_offset)) - valkey_master_repl_offset` | lag in bytes per pod |
+| `redis_instance_info{role="master"}` | which pod is the primary (exactly one) |
+| `redis_connected_slaves` | replicas attached to the primary (expect 2) |
+| `redis_master_link_up` | on replicas: link to the primary up (1) |
+| `redis_connected_slave_lag_seconds` | per-replica lag seen by the primary |
+| `scalar(max(redis_master_repl_offset)) - redis_master_repl_offset` | lag in bytes per pod |
 
 ### Persistence
 
 | PromQL | Meaning |
 |--------|---------|
-| `valkey_rdb_last_bgsave_status` | 1 = last snapshot succeeded |
-| `time() - valkey_rdb_last_save_timestamp_seconds` | seconds since the last successful save |
-| `valkey_rdb_changes_since_last_save` | writes at risk if the node restarts now |
+| `redis_rdb_last_bgsave_status` | 1 = last snapshot succeeded |
+| `time() - redis_rdb_last_save_timestamp_seconds` | seconds since the last successful save |
+| `redis_rdb_changes_since_last_save` | writes at risk if the node restarts now |
 | `kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes` | PVC fill level (when the CSI driver exposes volume stats) |
 
 ## 7.7 Alert rules

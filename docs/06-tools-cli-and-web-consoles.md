@@ -17,7 +17,7 @@
 | `kubectl` / `helm` | CLI | — | logs, status, CR lifecycle |
 | **Valkey Admin** | Web UI | `ValkeyAdmin` CR or `valkeyAdminConfig.enabled` | visual observability, topology, cluster health |
 | **Valkey Commander** | Web UI | `ValkeyCommander` CR or `valkeyCommanderConfig.enabled` (with login) | key browser, live stats, ad-hoc admin |
-| **Prometheus exporter** | metrics sidecar | `valkeyExporter.enabled` | time-series metrics → Prometheus/Grafana (module 7) |
+| **Prometheus exporter** | metrics sidecar | `valkeyReplicationConfig.valkeyExporter.enabled` | time-series metrics → Prometheus/Grafana (module 7) |
 | **Valkey MCP Server** | API for AI agents | `ValkeyMCPServer` CR | letting LLM agents / AI IDEs query Valkey |
 | Workshop scripts | bash | this repo | `topology.sh`, `health-check.sh`, `collect-diagnostics.sh` |
 
@@ -235,7 +235,7 @@ For the operator persona this means:
 | | Prometheus exporter | Valkey Admin | Valkey Commander |
 |-|---------------------|--------------|------------------|
 | Primary use | time-series metrics | visual observability and management | web administration |
-| Interface | `/metrics` on 9121 (HTTPS) | Web UI (8080) | Web UI (8081) |
+| Interface | `/metrics` on 9121 (HTTP on 3.5.1) | Web UI (8080) | Web UI (8081) |
 | Deployment | sidecar in each data pod | separate workload | separate workload |
 | Authentication | network-level | **none** (keep internal) | login secret |
 | Manages backups? | no | no | no (use CRs and kubectl) |
