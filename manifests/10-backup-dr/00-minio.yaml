@@ -78,6 +78,7 @@ metadata:
   name: minio
   namespace: ${MINIO_NS}
 spec:
+  type: ${MINIO_SERVICE_TYPE}             # env.sh: ClusterIP | LoadBalancer
   selector: {app: minio}
   ports:
     - {name: s3, port: 9000, targetPort: 9000}

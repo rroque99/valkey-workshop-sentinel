@@ -48,6 +48,7 @@ export SERVICE_TYPE="ClusterIP"                   # ClusterIP | LoadBalancer
 export MONITORING_NS="monitoring"
 export MONITORING_SERVICE_TYPE="ClusterIP"        # ClusterIP (port-forward) | LoadBalancer
 export MINIO_NS="minio"
+export MINIO_SERVICE_TYPE="ClusterIP"             # ClusterIP (port-forward) | LoadBalancer (MinIO S3 API + console)
 export BACKUP_BUCKET="valkey-backups"
 export DR_NS="valkey-workshop-dr"                 # DR "site" namespace (or namespace on DR cluster)
 export DR_CONTEXT=""                              # optional: kube context of a 2nd cluster for DR
@@ -83,7 +84,7 @@ export VALKEY_TLS="${VALKEY_TLS:-false}"
 # Anything not listed here (for example $labels in alert rules) is left untouched.
 export WORKSHOP_VARS="REGISTRY_SERVER OPERATOR_NS OPERATOR_VERSION CLUSTER_DOMAIN VALKEY_NS \
 SENTINEL_NAME REPL_NAME MASTER_GROUP VALKEY_VERSION VALKEY_TARGET_VERSION STORAGE_SIZE SERVICE_TYPE \
-MONITORING_NS MINIO_NS BACKUP_BUCKET DR_NS VALKEY_DEFAULT_PASSWORD VALKEY_ADMIN_PASSWORD \
+MONITORING_NS MINIO_NS MINIO_SERVICE_TYPE BACKUP_BUCKET DR_NS VALKEY_DEFAULT_PASSWORD VALKEY_ADMIN_PASSWORD \
 VALKEY_APP_PASSWORD VALKEY_MONITOR_PASSWORD SENTINEL_PASSWORD COMMANDER_PASSWORD MINIO_ROOT_PASSWORD \
 VALKEY_IMAGE DR_SOURCE_HOST SENTINEL_HOST"
 

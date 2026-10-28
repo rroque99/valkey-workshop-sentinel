@@ -35,7 +35,7 @@ kubectl version --client && helm version && envsubst --version | head -1
 | Worker nodes | **3** (4 recommended) | anti-affinity: 3 data pods and 3 Sentinels on different nodes; module 9 drains a node |
 | Allocatable capacity | ~6 vCPU / 12 GiB free | Valkey (6 pods), monitoring stack, MinIO, DR lab |
 | Default StorageClass | required | PVCs for Valkey, Prometheus, MinIO |
-| LoadBalancer | optional | only if `SERVICE_TYPE` / `MONITORING_SERVICE_TYPE` = `LoadBalancer` |
+| LoadBalancer | optional | only if `SERVICE_TYPE` / `MONITORING_SERVICE_TYPE` / `MINIO_SERVICE_TYPE` = `LoadBalancer` |
 | NetworkPolicy-capable CNI | optional | module 5 NetworkPolicy lab (Antrea or Calico on VKS) |
 | Permissions | `cluster-admin` | the operator installs CRDs, webhooks and cluster roles |
 | Egress | `tanzu-valkey.packages.broadcom.com`, `quay.io` (MinIO), `ghcr.io`/`docker.io`/`registry.k8s.io` (monitoring charts) | or mirror to an internal registry |
@@ -124,6 +124,7 @@ Open [`env.sh`](../env.sh) and review the **EDIT ME** section:
 | `STORAGE_SIZE` | `2Gi` | larger datasets |
 | `SERVICE_TYPE` | `ClusterIP` | you want external access for apps outside the cluster |
 | `MONITORING_SERVICE_TYPE` | `ClusterIP` | `LoadBalancer` saves port-forwarding to Grafana |
+| `MINIO_SERVICE_TYPE` | `ClusterIP` | `LoadBalancer` saves port-forwarding to the MinIO console (module 10) |
 | `DR_NS` / `DR_CONTEXT` | `valkey-workshop-dr` / empty | you have a second cluster for the DR lab |
 
 > **Sharing one cluster between students?** Each student sets a unique `VALKEY_NS`, `DR_NS` and `MINIO_NS`. The operator and the monitoring stack are installed once by the instructor.

@@ -70,6 +70,14 @@ kubectl -n "${MINIO_NS}" logs job/minio-create-bucket
 
 🔎 **Check:** the job log lists the `valkey-backups/` bucket.
 
+The Service type comes from `MINIO_SERVICE_TYPE` in `env.sh` (default `ClusterIP`). With `LoadBalancer`, wait for an external IP:
+
+```bash
+kubectl get svc minio -n "${MINIO_NS}"     # TYPE, EXTERNAL-IP, PORT(S) 9000 (S3 API) and 9001 (console)
+```
+
+The backup location (10.3) always uses the in-cluster address `minio.${MINIO_NS}.svc`, so backups work with either type. `LoadBalancer` only makes the console and S3 API reachable from outside the cluster, protected by the MinIO root password. Changed the value after deploying? `source ./env.sh` and re-run the `render … | kubectl apply` line above.
+
 > ⚠️ Production backups must live **outside** the cluster and ideally outside the site. In-cluster MinIO only demonstrates the mechanics.
 
 ## 10.3 Lab: create the backup location
@@ -120,7 +128,10 @@ kubectl logs -n "${VALKEY_NS}" -f "$(primary_pod)" -c persistence
 kubectl exec -n "${MINIO_NS}" deploy/minio -- ls -R "/data/${BACKUP_BUCKET}" | head -30
 
 # or browse the MinIO console: user valkey-backup, password $(cat .secrets/minio)
+# MINIO_SERVICE_TYPE=ClusterIP:
 kubectl port-forward -n "${MINIO_NS}" svc/minio 9001:9001   # http://localhost:9001
+# MINIO_SERVICE_TYPE=LoadBalancer:
+echo "http://$(kubectl get svc minio -n "${MINIO_NS}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}'):9001"
 ```
 
 Inspect the details:
