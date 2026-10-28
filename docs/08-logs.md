@@ -165,7 +165,7 @@ kubectl get pods -n "${VALKEY_NS}" -o custom-columns='POD:.metadata.name,RESTART
 
 | Log pattern | Probable cause | Action |
 |-------------|----------------|--------|
-| `NOAUTH Authentication required` | client didn't send credentials | check the client configuration and secret |
+| `NOAUTH Authentication required` | client didn't send credentials (for Commander: the `REDIS_*` env vars are missing, module 6.6) | check the client configuration and secret |
 | `WRONGPASS invalid username-password pair` | wrong credentials / unrotated client | `ACL LOG`; verify the secret and ACL file |
 | `NOPERM … no permissions` | user lacks a command/key permission | `ACL GETUSER <user>`, `ACL DRYRUN` |
 | `DENIED Running in protected mode` | ACL active, `default` without password | give `default` a password or disable it |

@@ -1,0 +1,10 @@
+# Merge-patch for the ValkeySentinel CR: enable the auto-provisioned Valkey Admin
+# (ClusterIP only, NO built-in login).
+#
+# The built-in Commander (valkeyCommanderConfig) is NOT enabled: on operator 3.5.1
+# it passes the data-pod credentials as VALKEY_USER/VALKEY_PASSWORD, but the
+# Commander image only reads REDIS_USERNAME/REDIS_PASSWORD, so it gets NOAUTH from
+# the primary. Commander is deployed stand-alone instead (05-valkey-commander.yaml).
+spec:
+  valkeyAdminConfig:
+    enabled: true

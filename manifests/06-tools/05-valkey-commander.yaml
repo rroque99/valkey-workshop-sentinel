@@ -1,0 +1,47 @@
+# Stand-alone Valkey Commander pointed at the workshop Sentinel group.
+# Field reference: property-reference-valkey.html#valkey-commander
+# Verify the schema for your version:  kubectl explain valkeycommander.spec
+#
+# Credentials are passed with spec.env using the variable names the Commander
+# image reads. On operator 3.5.1:
+#   - kubernetesConfig.valkeySecret is ignored on a stand-alone ValkeyCommander
+#     (it produces no env var), so it is not set here.
+#   - REDIS_USERNAME / REDIS_PASSWORD -> login to the primary/replicas.
+#     Without them Commander connects without a password and gets NOAUTH.
+#   - SENTINEL_USERNAME / SENTINEL_PASSWORD -> login to Sentinel (requirepass
+#     from valkeySentinelConfig.sentinelSecret, module 03).
+apiVersion: data.tanzu.vmware.com/v1
+kind: ValkeyCommander
+metadata:
+  name: ${SENTINEL_NAME}-commander-standalone
+  namespace: ${VALKEY_NS}
+spec:
+  sentinelHost: ${SENTINEL_NAME}-sentinel-headless
+  sentinelPort: "26379"
+  sentinelName: ${MASTER_GROUP}
+  loginSecret: ${SENTINEL_NAME}-commander-login
+  kubernetesConfig:
+    serviceType: ClusterIP
+    imagePullSecrets:
+      - name: valkey-registry-secret
+  env:
+    - name: REDIS_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: ${SENTINEL_NAME}-commander-valkey
+          key: username
+    - name: REDIS_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: ${SENTINEL_NAME}-commander-valkey
+          key: password
+    - name: SENTINEL_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: ${SENTINEL_NAME}-sentinel-credentials
+          key: username
+    - name: SENTINEL_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: ${SENTINEL_NAME}-sentinel-credentials
+          key: password

@@ -1,6 +1,6 @@
 # ALTERNATIVE to valkeyAdminConfig.enabled: a stand-alone ValkeyAdmin CR that
 # points at an existing instance. Useful when one Admin UI should be managed
-# separately from the instance lifecycle. Not needed if you applied 04-consoles-patch.yaml.
+# separately from the instance lifecycle. Not needed if you applied 04-admin-patch.yaml.
 # Field reference: property-reference-valkey.html#valkey-admin
 # Verify the schema for your version:  kubectl explain valkeyadmin.spec
 apiVersion: data.tanzu.vmware.com/v1

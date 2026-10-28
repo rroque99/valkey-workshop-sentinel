@@ -100,7 +100,7 @@ Manifests contain `${VARIABLES}` from `env.sh`. The `render` helper substitutes 
 source ./env.sh
 render manifests/03-sentinel/03-valkey-sentinel.yaml                  # preview
 render manifests/03-sentinel/03-valkey-sentinel.yaml | kubectl apply -f -
-patch-sentinel.sh manifests/06-tools/04-consoles-patch.yaml          # merge-patch the Sentinel CR
+patch-sentinel.sh manifests/06-tools/04-admin-patch.yaml             # merge-patch the Sentinel CR
 ```
 
 ## Conventions used in the labs

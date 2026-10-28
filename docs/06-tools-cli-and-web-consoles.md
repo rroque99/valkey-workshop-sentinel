@@ -16,7 +16,7 @@
 | `valkey-benchmark` | CLI | in the Tanzu Valkey image | load generation, capacity tests |
 | `kubectl` / `helm` | CLI | — | logs, status, CR lifecycle |
 | **Valkey Admin** | Web UI | `ValkeyAdmin` CR or `valkeyAdminConfig.enabled` | visual observability, topology, cluster health |
-| **Valkey Commander** | Web UI | `valkeyCommanderConfig.enabled` (with login) | key browser, live stats, ad-hoc admin |
+| **Valkey Commander** | Web UI | `ValkeyCommander` CR or `valkeyCommanderConfig.enabled` (with login) | key browser, live stats, ad-hoc admin |
 | **Prometheus exporter** | metrics sidecar | `valkeyExporter.enabled` | time-series metrics → Prometheus/Grafana (module 7) |
 | **Valkey MCP Server** | API for AI agents | `ValkeyMCPServer` CR | letting LLM agents / AI IDEs query Valkey |
 | Workshop scripts | bash | this repo | `topology.sh`, `health-check.sh`, `collect-diagnostics.sh` |
@@ -140,33 +140,48 @@ Useful flags if you call `valkey-benchmark` directly:
 | Option | How | When |
 |--------|-----|------|
 | **A. Auto-provisioned** | `spec.valkeyAdminConfig.enabled: true` on the `ValkeySentinel` | simplest: lifecycle tied to the instance |
-| B. Stand-alone | a `ValkeyAdmin` CR pointing at a host/port ([example](../manifests/06-tools/05-valkey-admin-standalone.yaml)) | manage the UI separately, or point it at any endpoint |
+| B. Stand-alone | a `ValkeyAdmin` CR pointing at a host/port ([example](../manifests/06-tools/06-valkey-admin-standalone.yaml)) | manage the UI separately, or point it at any endpoint |
 
 ⚠️ **Valkey Admin has no built-in web authentication.** Its service stays **ClusterIP** and you reach it with `kubectl port-forward`. Never expose it with a LoadBalancer or Ingress without an authenticating proxy (OAuth2 Proxy, VPN).
 
 ## 6.6 Valkey Commander
 
-**Valkey Commander** is a web UI for browsing keys, viewing live statistics and doing administrative tasks. Unlike Admin, it supports a **login secret** (`username` / `password`).
+**Valkey Commander** is a web UI for browsing keys, viewing live statistics and doing administrative tasks. Unlike Admin, it supports a **login secret** (`username` / `password`). Like Admin, you can deploy it in two ways:
+
+| Option | How | Status on operator 3.5.1 |
+|--------|-----|--------------------------|
+| Auto-provisioned | `spec.valkeyCommanderConfig.enabled: true` on the `ValkeySentinel` | ❌ can't log in to a password-protected instance (see the caution below) |
+| **Stand-alone** | a `ValkeyCommander` CR pointing at the Sentinel group ([manifest](../manifests/06-tools/05-valkey-commander.yaml)) | ✅ used in this lab |
+
+⚠️ **Caution: the built-in Commander gets `NOAUTH` on 3.5.1.** The operator passes the data-pod credentials to the Commander pod as `VALKEY_USER` / `VALKEY_PASSWORD`, but the Commander image only reads `REDIS_USERNAME` / `REDIS_PASSWORD`. Commander logs in to Sentinel and finds the primary, then connects to it **without** a password: the UI shows `ERROR: Status: reconnecting` and `NOAUTH Authentication required.` `valkeyCommanderConfig` has no field to fix this, and on a stand-alone `ValkeyCommander` the documented `kubernetesConfig.valkeySecret` is ignored. The lab therefore deploys a stand-alone `ValkeyCommander` and passes the credentials with `spec.env`:
+
+| Env var | Secret | Used for |
+|---------|--------|----------|
+| `REDIS_USERNAME` / `REDIS_PASSWORD` | `vk-sentinel-commander-valkey` (`admin`) | login to the primary and replicas |
+| `SENTINEL_USERNAME` / `SENTINEL_PASSWORD` | `vk-sentinel-sentinel-credentials` (module 3) | login to Sentinel |
+| (`loginSecret`) | `vk-sentinel-commander-login` (`operator`) | login to the web UI |
 
 ## 6.7 Lab: enable both consoles
 
 ```bash
-render manifests/06-tools/03-commander-login-secret.yaml | kubectl apply -f -
-patch-sentinel.sh manifests/06-tools/04-consoles-patch.yaml
-kubectl get pods,svc -n "${VALKEY_NS}" -w
+# Valkey Admin: auto-provisioned by the ValkeySentinel CR
+patch-sentinel.sh manifests/06-tools/04-admin-patch.yaml
+
+# Valkey Commander: stand-alone CR with its own secrets
+render manifests/06-tools/03-commander-secrets.yaml | kubectl apply -f -
+render manifests/06-tools/05-valkey-commander.yaml  | kubectl apply -f -
+
+kubectl get valkeyadmins,valkeycommanders,pods,svc -n "${VALKEY_NS}"
 ```
 
-🔎 **Check:** new Admin and Commander pods and services appear. Find their names and ports:
+> Applying the patch prints `Warning: spec.kubernetesConfig.valkeySecret and spec.acl are both set …`. That's expected: the `valkeySecret` user (`default`) has `+@all`, so the operator heartbeat can run `PING`. Only the Admin and Commander workloads change; the data and Sentinel pods don't restart.
+
+🔎 **Check:** `vk-sentinel-admin` and `vk-sentinel-commander-standalone` are `Running`, each with a pod and a ClusterIP Service. There's **no** `vk-sentinel-commander`: the built-in Commander isn't enabled.
+
+**Open Valkey Admin** (port 8080):
 
 ```bash
-kubectl get svc -n "${VALKEY_NS}" | grep -Ei 'admin|commander'
-```
-
-**Open Valkey Admin** (default container port 8080):
-
-```bash
-ADMIN_SVC=$(kubectl get svc -n "${VALKEY_NS}" -o name | grep -i admin | head -1)
-kubectl port-forward -n "${VALKEY_NS}" "${ADMIN_SVC}" 8080:8080
+kubectl port-forward -n "${VALKEY_NS}" "svc/${SENTINEL_NAME}-admin" 8080:8080
 # browse http://localhost:8080
 ```
 
@@ -175,14 +190,19 @@ Explore: connection/topology view (primary and replicas labelled), memory and op
 **Open Valkey Commander** (port 8081):
 
 ```bash
-CMD_SVC=$(kubectl get svc -n "${VALKEY_NS}" -o name | grep -i commander | head -1)
-kubectl port-forward -n "${VALKEY_NS}" "${CMD_SVC}" 8081:8081
+kubectl port-forward -n "${VALKEY_NS}" "svc/${SENTINEL_NAME}-commander-standalone" 8081:8081
 # browse http://localhost:8081   user: operator   password: $(cat .secrets/commander)
 ```
 
 Explore: the instance tree, `app:*` keys (create one, set a TTL, watch it expire), server info and the CLI tab.
 
-> If a console can't connect to Valkey, check its pod logs. The usual cause is authentication (`NOAUTH`/`WRONGPASS`) or protected mode (`default` user without a password). See the troubleshooting guide.
+🔎 **Check:** Commander shows the instance without errors, and the primary lists Commander as a client logged in as `admin`:
+
+```bash
+vcli "$(primary_pod)" CLIENT LIST | grep redis-commander    # ... name=redis-commander ... user=admin
+```
+
+> If a console can't connect, check its pod logs (`kubectl logs -n "${VALKEY_NS}" deploy/<name>`). `NOAUTH` from Commander means the `REDIS_*` env vars are missing (the built-in Commander, or `valkeySecret` used instead of `env`). `WRONGPASS` means the secret doesn't match the ACL file. See the troubleshooting guide.
 
 ## 6.8 Valkey MCP Server (overview)
 

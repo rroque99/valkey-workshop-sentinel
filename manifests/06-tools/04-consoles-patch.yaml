@@ -1,9 +1,0 @@
-# Merge-patch for the ValkeySentinel CR: enable both web consoles.
-#   valkeyAdminConfig      -> operator auto-provisions a ValkeyAdmin (ClusterIP only, NO built-in login)
-#   valkeyCommanderConfig  -> Valkey Commander with a login secret
-spec:
-  valkeyAdminConfig:
-    enabled: true
-  valkeyCommanderConfig:
-    enabled: true
-    loginSecret: ${SENTINEL_NAME}-commander-login

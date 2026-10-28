@@ -61,6 +61,7 @@ flowchart TD
 | TLS handshake failures | SAN doesn't cover the pod FQDN; missing `clientAuth` EKU for mTLS; `clusterDomain` mismatch | reissue the certificate (module 5.8) |
 | OAuth/LDAP users can't connect | wrong port; sidecar errors | connect to the auth port (6380); check `valkeySecret` has `+@admin`; sidecar logs |
 | Commander/Admin shows connection errors | console auth or protected mode | console pod logs; `valkeySecret` / ACL |
+| Commander: `ERROR: Status: reconnecting`, log `NOAUTH Authentication required` from `setUpConnection (S:…)` | built-in Commander (`valkeyCommanderConfig`) on 3.5.1: data-pod credentials passed as `VALKEY_*`, image reads `REDIS_*` | use the stand-alone `ValkeyCommander` with `REDIS_USERNAME`/`REDIS_PASSWORD` in `spec.env` (module 6.6) |
 | `max number of clients reached` | `maxclients` hit | find the leak (`CLIENT LIST`, group by `addr`/`user`); raise `maxClients` |
 
 ## 12.4 Writes failing
