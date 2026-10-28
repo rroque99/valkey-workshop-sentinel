@@ -47,9 +47,9 @@ vcli() {
     set -- --tls --insecure "$@"
   fi
   if [ -n "${VALKEY_CONTAINER}" ]; then
-    kubectl exec -n "$ns" "$pod" -c "${VALKEY_CONTAINER}" -- valkey-cli "$@"
+    kubectl exec --quiet -n "$ns" "$pod" -c "${VALKEY_CONTAINER}" -- valkey-cli "$@"
   else
-    kubectl exec -n "$ns" "$pod" -- valkey-cli "$@"
+    kubectl exec --quiet -n "$ns" "$pod" -- valkey-cli "$@"
   fi
 }
 
@@ -64,9 +64,9 @@ scli() {
     set -- --tls --insecure "$@"
   fi
   if [ -n "${SENTINEL_CONTAINER}" ]; then
-    kubectl exec -n "$ns" "$pod" -c "${SENTINEL_CONTAINER}" -- valkey-cli "$@"
+    kubectl exec --quiet -n "$ns" "$pod" -c "${SENTINEL_CONTAINER}" -- valkey-cli "$@"
   else
-    kubectl exec -n "$ns" "$pod" -- valkey-cli "$@"
+    kubectl exec --quiet -n "$ns" "$pod" -- valkey-cli "$@"
   fi
 }
 
