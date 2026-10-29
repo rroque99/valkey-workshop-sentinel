@@ -115,13 +115,21 @@ render manifests/10-backup-dr/03-backup-ondemand.yaml | kubectl apply -f -
 kubectl get valkeybackup -n "${VALKEY_NS}" -w          # Pending -> Running -> Succeeded
 ```
 
-While it runs, follow the persistence container in the **primary** pod:
+While it runs, follow the persistence containers of **all** data pods. Each pod's persistence container reconciles the backup, but only one of them uploads, and on 3.5.1 that can be a **replica** rather than the primary:
 
 ```bash
-kubectl logs -n "${VALKEY_NS}" -f "$(primary_pod)" -c persistence
+kubectl logs -n "${VALKEY_NS}" -f -l app="${REPL_NAME}" -c persistence --prefix --max-log-requests 3 | grep -v '"debug"'
 ```
 
-🔎 **Check:** status `Succeeded`. Confirm the object exists in S3:
+The pod that uploads logs `data will be uploaded to s3://…`. The other pods log only reconcile steps (and sometimes `the object has been modified`, which is harmless).
+
+> ⚠️ **`Succeeded` isn't proof (3.5.1).** If the upload fails, the operator can still mark the backup `Succeeded` on a retry, and `SIZE` (`status.dataSize`) stays empty. Always confirm the object exists in S3 (next step). The persistence log only shows `error while executing the copy command`. The real S3 error is in the rclone log inside the uploading pod:
+>
+> ```bash
+> kubectl exec -n "${VALKEY_NS}" <uploading-pod> -c persistence -- sh -c 'tail -5 /opt/toss/logs/*.log'
+> ```
+
+🔎 **Check:** status `Succeeded` **and** a non-empty `SIZE`. Confirm the object exists in S3:
 
 ```bash
 # MinIO stores each object as a directory under /data/<bucket>/<object-path>/

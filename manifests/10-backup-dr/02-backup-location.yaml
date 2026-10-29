@@ -12,7 +12,7 @@ spec:
   storage:
     s3:
       bucket: "${BACKUP_BUCKET}"
-      bucketPath: "/${VALKEY_NS}/"        # must end with "/"
+      bucketPath: "/${VALKEY_NS}"         # no trailing "/": the operator appends "/<backup>", and "//" is rejected by MinIO
       region: "us-east-1"                 # any non-empty value for MinIO
       endpoint: "http://minio.${MINIO_NS}.svc.${CLUSTER_DOMAIN}:9000"
       enableSsl: false                    # true for real S3 endpoints (https)

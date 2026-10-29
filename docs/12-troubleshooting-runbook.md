@@ -108,7 +108,8 @@ flowchart TD
 
 | Symptom | Diagnose | Fix |
 |---------|----------|-----|
-| Backup `Pending`/`Failed` | `kubectl describe valkeybackup`, `kubectl logs <primary> -c persistence`, operator logs | S3 endpoint/credentials/bucket, `bucketPath` must end with `/`, instance not running, persistence disabled |
+| Backup `Pending`/`Failed` | `kubectl describe valkeybackup`, `kubectl logs -l app=<repl> -c persistence --prefix` (the uploader may be a replica), operator logs | S3 endpoint/credentials/bucket, instance not running, persistence disabled |
+| Backup `Succeeded` but no object in S3, empty `SIZE` | rclone log in the uploading pod: `kubectl exec <pod> -c persistence -- sh -c 'tail /opt/toss/logs/*.log'` | `XMinioInvalidObjectName` / `//` in the path: remove the trailing `/` from `bucketPath`. Delete the bad `ValkeyBackup` and create it again |
 | Backup refers to the wrong object | `valkeyInstance` | for Sentinel, use the **ValkeyReplication** name |
 | Restore `Failed` | `kubectl describe valkeyrestore` | backup not found / not `Succeeded`; target ACL/credentials secrets missing; insufficient storage; different namespace |
 | Version upgrade stuck | `kubectl describe valkeyversionupgrade`, operator logs, pod events | target version not in `kubectl get valkeyversions`; persistence disabled; backup location wrong |
