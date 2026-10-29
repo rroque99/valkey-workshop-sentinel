@@ -594,7 +594,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Which pod is the writer, which are replicas, and the worker node each one runs on.",
+      "description": "Which pod is the writer, which are replicas, and the worker node each one runs on. Version is valkey_version (INFO server). redis_version is always 7.2.4, a Redis-compatibility value, so it isn't shown.",
       "gridPos": {
         "x": 0,
         "y": 5,
@@ -607,7 +607,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "max by (pod, role, node, redis_version, valkey_version) ({__name__=\"${prefix}_instance_info\", namespace=\"$namespace\", pod=~\"$pod\"})",
+          "expr": "max by (pod, role, node, valkey_version) ({__name__=\"${prefix}_instance_info\", namespace=\"$namespace\", pod=~\"$pod\"})",
           "legendFormat": "",
           "refId": "A",
           "range": false,
@@ -627,8 +627,13 @@
               "pod": "Pod",
               "role": "Role",
               "node": "Node",
-              "redis_version": "Version",
-              "valkey_version": "Valkey version"
+              "valkey_version": "Version"
+            },
+            "indexByName": {
+              "node": 0,
+              "pod": 1,
+              "valkey_version": 2,
+              "role": 3
             }
           }
         }
