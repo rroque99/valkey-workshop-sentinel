@@ -1,5 +1,8 @@
 # Where backups are stored. Use a unique bucket or bucketPath per namespace.
 # Docs: https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-for-valkey-on-kubernetes/3-5/valkey-on-kubernetes/backup.html
+# The docs example uses "enableSSL" and "secret: {name: ...}"; the 3.5.1 CRD
+# rejects both. It has "enableSsl" and "secret: <secret-name>" (check with
+# kubectl explain valkeybackuplocation.spec.storage.s3).
 apiVersion: data.tanzu.vmware.com/v1
 kind: ValkeyBackupLocation
 metadata:
@@ -12,6 +15,5 @@ spec:
       bucketPath: "/${VALKEY_NS}/"        # must end with "/"
       region: "us-east-1"                 # any non-empty value for MinIO
       endpoint: "http://minio.${MINIO_NS}.svc.${CLUSTER_DOMAIN}:9000"
-      enableSSL: false                    # true for real S3 endpoints (https)
-      secret:
-        name: valkey-backup-s3-credentials
+      enableSsl: false                    # true for real S3 endpoints (https)
+      secret: valkey-backup-s3-credentials  # Secret name (a string, not {name: ...})
